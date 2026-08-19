@@ -1,0 +1,150 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/movement_lab.gd" id="1_lab"]
+[ext_resource type="Script" path="res://scripts/world/isometric_arena.gd" id="2_arena"]
+
+[node name="MovementLab" type="Node2D"]
+script = ExtResource("1_lab")
+
+[node name="Arena" type="Node2D" parent="."]
+script = ExtResource("2_arena")
+
+[node name="PlayerSpawn" type="Marker2D" parent="."]
+unique_name_in_owner = true
+position = Vector2(390, 720)
+
+[node name="Interface" type="CanvasLayer" parent="."]
+
+[node name="TopPanel" type="ColorRect" parent="Interface"]
+offset_left = 22.0
+offset_top = 18.0
+offset_right = 420.0
+offset_bottom = 142.0
+color = Color(0.025, 0.082, 0.129, 0.9)
+
+[node name="CharacterLabel" type="Label" parent="Interface/TopPanel"]
+unique_name_in_owner = true
+offset_left = 18.0
+offset_top = 12.0
+offset_right = 378.0
+offset_bottom = 38.0
+theme_override_font_sizes/font_size = 19
+text = "Personagem"
+
+[node name="ActionLabel" type="Label" parent="Interface/TopPanel"]
+unique_name_in_owner = true
+offset_left = 18.0
+offset_top = 44.0
+offset_right = 378.0
+offset_bottom = 68.0
+theme_override_colors/font_color = Color(0.72, 0.81, 0.86, 1)
+text = "Espaço / clique: ação"
+
+[node name="HealthLabel" type="Label" parent="Interface/TopPanel"]
+unique_name_in_owner = true
+offset_left = 18.0
+offset_top = 70.0
+offset_right = 160.0
+offset_bottom = 91.0
+theme_override_colors/font_color = Color(0.91, 0.36, 0.46, 1)
+theme_override_font_sizes/font_size = 13
+text = "VIDA  100 / 100"
+
+[node name="HealthBar" type="ProgressBar" parent="Interface/TopPanel"]
+unique_name_in_owner = true
+offset_left = 164.0
+offset_top = 73.0
+offset_right = 378.0
+offset_bottom = 87.0
+value = 100.0
+show_percentage = false
+
+[node name="CooldownBar" type="ProgressBar" parent="Interface/TopPanel"]
+unique_name_in_owner = true
+offset_left = 18.0
+offset_top = 104.0
+offset_right = 378.0
+offset_bottom = 112.0
+value = 100.0
+show_percentage = false
+
+[node name="EnemyLabel" type="Label" parent="Interface"]
+unique_name_in_owner = true
+offset_left = 500.0
+offset_top = 22.0
+offset_right = 652.0
+offset_bottom = 54.0
+theme_override_colors/font_color = Color(0.73, 0.55, 0.84, 1)
+theme_override_font_sizes/font_size = 17
+text = "INIMIGOS  8"
+horizontal_alignment = 1
+
+[node name="Controls" type="Label" parent="Interface"]
+offset_left = 22.0
+offset_top = 585.0
+offset_right = 660.0
+offset_bottom = 624.0
+theme_override_colors/font_color = Color(0.72, 0.81, 0.86, 1)
+theme_override_font_sizes/font_size = 15
+text = "WASD / Setas: mover em 8 direções    •    Espaço / Clique: ação    •    Esc: trocar"
+
+[node name="ChangeCharacter" type="Button" parent="Interface"]
+offset_left = 946.0
+offset_top = 18.0
+offset_right = 1130.0
+offset_bottom = 58.0
+text = "Trocar personagem"
+
+[node name="HealDebug" type="Button" parent="Interface"]
+offset_left = 786.0
+offset_top = 70.0
+offset_right = 946.0
+offset_bottom = 108.0
+text = "[DEBUG] Curar"
+
+[node name="KillDebug" type="Button" parent="Interface"]
+offset_left = 958.0
+offset_top = 70.0
+offset_right = 1130.0
+offset_bottom = 108.0
+text = "[DEBUG] Morrer"
+
+[node name="ResultPanel" type="ColorRect" parent="Interface"]
+unique_name_in_owner = true
+offset_left = 368.0
+offset_top = 220.0
+offset_right = 784.0
+offset_bottom = 430.0
+color = Color(0.025, 0.082, 0.129, 0.96)
+
+[node name="ResultTitle" type="Label" parent="Interface/ResultPanel"]
+unique_name_in_owner = true
+offset_left = 24.0
+offset_top = 24.0
+offset_right = 392.0
+offset_bottom = 65.0
+theme_override_font_sizes/font_size = 27
+text = "SALA CONCLUÍDA"
+horizontal_alignment = 1
+
+[node name="ResultDetail" type="Label" parent="Interface/ResultPanel"]
+unique_name_in_owner = true
+offset_left = 24.0
+offset_top = 78.0
+offset_right = 392.0
+offset_bottom = 108.0
+theme_override_colors/font_color = Color(0.72, 0.81, 0.86, 1)
+text = "Todos os inimigos foram derrotados."
+horizontal_alignment = 1
+
+[node name="Restart" type="Button" parent="Interface/ResultPanel"]
+offset_left = 78.0
+offset_top = 133.0
+offset_right = 338.0
+offset_bottom = 181.0
+text = "Reiniciar sala"
+
+[connection signal="pressed" from="Interface/ChangeCharacter" to="." method="_on_change_character_pressed"]
+[connection signal="pressed" from="Interface/HealDebug" to="." method="_on_heal_debug_pressed"]
+[connection signal="pressed" from="Interface/KillDebug" to="." method="_on_kill_debug_pressed"]
+[connection signal="pressed" from="Interface/ResultPanel/Restart" to="." method="_on_restart_pressed"]

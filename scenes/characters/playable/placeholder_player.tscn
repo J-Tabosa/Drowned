@@ -1,0 +1,89 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://scripts/characters/player_controller.gd" id="1_controller"]
+[ext_resource type="Script" path="res://scripts/components/health_component.gd" id="2_health"]
+[ext_resource type="Script" path="res://scripts/components/hurtbox.gd" id="3_hurtbox"]
+[ext_resource type="Script" path="res://scripts/components/hitbox.gd" id="4_hitbox"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape_player"]
+size = Vector2(46, 68)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape_hurtbox"]
+size = Vector2(42, 62)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape_melee"]
+size = Vector2(86, 54)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape_dash"]
+size = Vector2(52, 76)
+
+[node name="PlaceholderPlayer" type="CharacterBody2D"]
+collision_layer = 1
+collision_mask = 2
+script = ExtResource("1_controller")
+
+[node name="Camera2D" type="Camera2D" parent="."]
+unique_name_in_owner = true
+enabled = true
+position_smoothing_enabled = true
+position_smoothing_speed = 6.0
+limit_left = 0
+limit_top = 0
+limit_right = 2300
+limit_bottom = 1400
+limit_smoothed = true
+
+[node name="Shadow" type="Polygon2D" parent="."]
+unique_name_in_owner = true
+position = Vector2(0, 35)
+color = Color(0, 0, 0, 0.35)
+polygon = PackedVector2Array(-28, -8, 28, -8, 28, 8, -28, 8)
+
+[node name="Body" type="Polygon2D" parent="."]
+unique_name_in_owner = true
+color = Color(0.91, 0.36, 0.46, 1)
+polygon = PackedVector2Array(-23, -34, 23, -34, 23, 34, -23, 34)
+
+[node name="Highlight" type="Polygon2D" parent="Body"]
+position = Vector2(-13, -21)
+color = Color(1, 1, 1, 0.25)
+polygon = PackedVector2Array(-4, -7, 4, -7, 4, 7, -4, 7)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape_player")
+
+[node name="HealthComponent" type="Node" parent="."]
+unique_name_in_owner = true
+script = ExtResource("2_health")
+
+[node name="Hurtbox" type="Area2D" parent="."]
+collision_layer = 4
+collision_mask = 0
+monitoring = false
+script = ExtResource("3_hurtbox")
+health_component_path = NodePath("../HealthComponent")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Hurtbox"]
+shape = SubResource("RectangleShape_hurtbox")
+
+[node name="MeleeHitbox" type="Area2D" parent="."]
+unique_name_in_owner = true
+collision_layer = 0
+collision_mask = 8
+monitorable = false
+script = ExtResource("4_hitbox")
+knockback_force = 300.0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="MeleeHitbox"]
+shape = SubResource("RectangleShape_melee")
+
+[node name="DashHitbox" type="Area2D" parent="."]
+unique_name_in_owner = true
+collision_layer = 0
+collision_mask = 8
+monitorable = false
+script = ExtResource("4_hitbox")
+knockback_force = 360.0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="DashHitbox"]
+shape = SubResource("RectangleShape_dash")
