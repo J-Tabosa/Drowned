@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/underwater_cave.gd" id="1_cave"]
+
+[node name="UnderwaterCave" type="Node2D"]
+script = ExtResource("1_cave")
