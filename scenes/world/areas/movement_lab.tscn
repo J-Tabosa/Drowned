@@ -1,7 +1,8 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3]
 
-[ext_resource type="Script" path="res://scripts/world/underwater_cave_lab.gd" id="1_lab"]
+[ext_resource type="Script" path="res://scripts/world/tile_cave_lab.gd" id="1_lab"]
 [ext_resource type="PackedScene" path="res://scenes/world/areas/underwater_cave.tscn" id="2_cave"]
+[ext_resource type="PackedScene" path="res://scenes/ui/hud/boss_intro_card.tscn" id="3_boss_card"]
 
 [node name="MovementLab" type="Node2D"]
 script = ExtResource("1_lab")
@@ -11,6 +12,15 @@ script = ExtResource("1_lab")
 [node name="PlayerSpawn" type="Marker2D" parent="."]
 unique_name_in_owner = true
 position = Vector2(620, 1840)
+
+[node name="CutsceneCamera" type="Camera2D" parent="."]
+unique_name_in_owner = true
+enabled = false
+position_smoothing_enabled = true
+position_smoothing_speed = 5.0
+
+[node name="BossIntroCard" parent="." instance=ExtResource("3_boss_card")]
+unique_name_in_owner = true
 
 [node name="Interface" type="CanvasLayer" parent="."]
 
@@ -147,14 +157,14 @@ show_percentage = false
 [node name="TutorialPanel" type="ColorRect" parent="Interface"]
 unique_name_in_owner = true
 offset_left = 296.0
-offset_top = 442.0
+offset_top = 414.0
 offset_right = 856.0
 offset_bottom = 588.0
 color = Color(0.025, 0.082, 0.129, 0.95)
 
 [node name="TutorialAccent" type="ColorRect" parent="Interface/TutorialPanel"]
 offset_right = 8.0
-offset_bottom = 146.0
+offset_bottom = 174.0
 color = Color(0.22, 0.81, 0.69, 1)
 
 [node name="TutorialTitle" type="Label" parent="Interface/TutorialPanel"]
@@ -170,19 +180,19 @@ text = "TREINAMENTO DE SOBREVIVÊNCIA"
 [node name="TutorialStep" type="Label" parent="Interface/TutorialPanel"]
 unique_name_in_owner = true
 offset_left = 26.0
-offset_top = 51.0
+offset_top = 48.0
 offset_right = 536.0
-offset_bottom = 100.0
+offset_bottom = 128.0
 theme_override_colors/font_color = Color(0.8, 0.88, 0.91, 1)
 theme_override_font_sizes/font_size = 15
-text = "[0%] Mova-se com WASD ou setas\n[PENDENTE] Use a habilidade"
+text = "[0%] Mova-se com WASD ou setas\n[0%] Corra segurando Ctrl\n[PENDENTE] Use a habilidade"
 
 [node name="TutorialProgress" type="ProgressBar" parent="Interface/TutorialPanel"]
 unique_name_in_owner = true
 offset_left = 26.0
-offset_top = 112.0
+offset_top = 142.0
 offset_right = 536.0
-offset_bottom = 128.0
+offset_bottom = 158.0
 value = 0.0
 show_percentage = false
 
@@ -193,7 +203,7 @@ offset_right = 780.0
 offset_bottom = 642.0
 theme_override_colors/font_color = Color(0.72, 0.81, 0.86, 1)
 theme_override_font_sizes/font_size = 14
-text = "WASD / Setas: mover    •    Espaço / J / Clique: habilidade    •    Esc: trocar"
+text = "WASD / Setas: mover    •    Segurar Ctrl: correr    •    Espaço / J / Clique: habilidade    •    Esc: trocar"
 
 [node name="ChangeCharacter" type="Button" parent="Interface"]
 offset_left = 946.0

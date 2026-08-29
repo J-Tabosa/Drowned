@@ -1,7 +1,7 @@
 extends RefCounted
 
 
-## Monta uma introdução com o jogador ao centro, dois amigos e a entrada de um monstro.
+## Monta a conversa inicial somente com o trio, apresentando a exploração da caverna.
 static func get_intro(character_id: String) -> Dictionary:
 	var player := _profile(character_id)
 	var friends: Array[Dictionary] = []
@@ -10,18 +10,11 @@ static func get_intro(character_id: String) -> Dictionary:
 			friends.append(_profile(profile.id))
 	var friend_left: Dictionary = friends[0]
 	var friend_right: Dictionary = friends[1]
-	var monster := {
-		"id": "abyssal_creature",
-		"name": "Criatura Abissal",
-		"color": Color("8f5bb7"),
-		"portrait": null,
-	}
 	return _build_sequence(
 		{
 			"player": player,
 			"friend_left": friend_left,
 			"friend_right": friend_right,
-			"monster": monster,
 		},
 		{
 			"left": "friend_left",
@@ -31,35 +24,68 @@ static func get_intro(character_id: String) -> Dictionary:
 		[
 			{
 				"actor": "friend_left",
-				"text": "Finalmente! %s, você está inteiro." % player.name,
-			},
-			{
-				"actor": "player",
-				"text": "Por pouco. E vocês dois? A corrente separou o resto da tripulação.",
+				"text": "Ainda estamos inteiros. Já é mais do que eu esperava depois daquela corrente.",
 			},
 			{
 				"actor": "friend_right",
-				"text": "Estamos vivos. Mas há alguma coisa circulando entre aquelas ruínas.",
+				"text": "A água trouxe a gente para uma caverna enorme. Deve existir outra passagem por aqui.",
 			},
 			{
 				"actor": "player",
-				"text": "Fiquem perto. Encontramos uma saída juntos.",
+				"text": "Então vamos explorar a área. Devagar, procurando sinais de uma saída e do resto da tripulação.",
 			},
 			{
-				"actor": "monster",
-				"transitions": [
-					{"action": "exit", "slot": "left"},
-					{"action": "replace", "slot": "right", "actor": "monster"},
-				],
-				"text": "A superfície continua devolvendo náufragos às nossas portas.",
+				"actor": "friend_left",
+				"text": "Sem se separar desta vez. Se alguma coisa se mover, avisem antes de atacar.",
 			},
 			{
 				"actor": "player",
-				"text": "Se entende nossa língua, então entende isto: fique longe deles.",
+				"text": "Combinado. Fiquem perto de mim. Vamos descobrir onde fomos parar.",
+			},
+		]
+	)
+
+
+## Monta o diálogo disparado após os mobs, enquanto a câmera revela o mini-chefe.
+static func get_boss_reveal(character_id: String) -> Dictionary:
+	var player := _profile(character_id)
+	var friends: Array[Dictionary] = []
+	for profile in GameState.CHARACTER_PROFILES:
+		if profile.id != character_id:
+			friends.append(_profile(profile.id))
+	var friend_left: Dictionary = friends[0]
+	var friend_right: Dictionary = friends[1]
+	return _build_sequence(
+		{
+			"player": player,
+			"friend_left": friend_left,
+			"friend_right": friend_right,
+		},
+		{
+			"left": "friend_left",
+			"center": "player",
+			"right": "friend_right",
+		},
+		[
+			{
+				"actor": "friend_right",
+				"text": "O que raios é aquilo?",
 			},
 			{
-				"actor": "monster",
-				"text": "Atlântida não pertence aos vivos.",
+				"actor": "friend_left",
+				"text": "Não é igual aos Afogados que enfrentamos. Aquilo estava esperando por nós.",
+			},
+			{
+				"actor": "player",
+				"text": "É o guardião desta passagem. Não entrem na sala até estarmos prontos.",
+			},
+			{
+				"actor": "friend_right",
+				"text": "Ótimo. Um monstro gigante entre nós e a única saída.",
+			},
+			{
+				"actor": "player",
+				"text": "Fiquem atentos ao avanço dele. Quando abrir uma brecha, nós atacamos juntos.",
 			},
 		]
 	)

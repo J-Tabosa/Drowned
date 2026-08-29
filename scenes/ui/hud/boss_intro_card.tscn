@@ -1,0 +1,151 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/boss_intro_card.gd" id="1_card"]
+
+[node name="BossIntroCard" type="CanvasLayer"]
+process_mode = 3
+layer = 90
+script = ExtResource("1_card")
+
+[node name="Curtain" type="Control" parent="."]
+unique_name_in_owner = true
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+
+[node name="Dimmer" type="ColorRect" parent="Curtain"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.006, 0.015, 0.031, 0.92)
+
+[node name="ThemeBar" type="Polygon2D" parent="Curtain"]
+unique_name_in_owner = true
+position = Vector2(0, 142)
+color = Color(0.61, 0.35, 0.71, 0.92)
+polygon = PackedVector2Array(0, 55, 1152, 0, 1152, 360, 0, 425)
+
+[node name="PortraitPanel" type="Control" parent="Curtain"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 68.0
+offset_top = 72.0
+offset_right = 468.0
+offset_bottom = 618.0
+
+[node name="PortraitShadow" type="ColorRect" parent="Curtain/PortraitPanel"]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 506.0
+offset_right = 365.0
+offset_bottom = 540.0
+color = Color(0, 0, 0, 0.5)
+
+[node name="PortraitBody" type="ColorRect" parent="Curtain/PortraitPanel"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 78.0
+offset_top = 162.0
+offset_right = 330.0
+offset_bottom = 512.0
+color = Color(0.55, 0.29, 0.65, 1)
+
+[node name="PortraitShoulderLeft" type="ColorRect" parent="Curtain/PortraitPanel/PortraitBody"]
+layout_mode = 0
+offset_left = -58.0
+offset_top = 48.0
+offset_right = 2.0
+offset_bottom = 304.0
+rotation = 0.16
+color = Color(0.43, 0.2, 0.56, 1)
+
+[node name="PortraitShoulderRight" type="ColorRect" parent="Curtain/PortraitPanel/PortraitBody"]
+layout_mode = 0
+offset_left = 250.0
+offset_top = 48.0
+offset_right = 310.0
+offset_bottom = 304.0
+rotation = -0.16
+color = Color(0.43, 0.2, 0.56, 1)
+
+[node name="PortraitHead" type="ColorRect" parent="Curtain/PortraitPanel"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 126.0
+offset_top = 32.0
+offset_right = 282.0
+offset_bottom = 177.0
+color = Color(0.69, 0.43, 0.76, 1)
+
+[node name="PortraitEye" type="ColorRect" parent="Curtain/PortraitPanel/PortraitHead"]
+layout_mode = 0
+offset_left = 34.0
+offset_top = 67.0
+offset_right = 122.0
+offset_bottom = 84.0
+color = Color(0.88, 0.93, 0.8, 1)
+
+[node name="InformationPanel" type="Control" parent="Curtain"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 510.0
+offset_top = 172.0
+offset_right = 1090.0
+offset_bottom = 500.0
+
+[node name="EncounterLabel" type="Label" parent="Curtain/InformationPanel"]
+layout_mode = 0
+offset_right = 560.0
+offset_bottom = 30.0
+theme_override_colors/font_color = Color(0.88, 0.9, 0.92, 0.82)
+theme_override_font_sizes/font_size = 15
+text = "AMEAÇA IDENTIFICADA"
+
+[node name="TitleLabel" type="Label" parent="Curtain/InformationPanel"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_top = 38.0
+offset_right = 560.0
+offset_bottom = 94.0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 38
+text = "GUARDIÃO ABISSAL"
+
+[node name="SubtitleLabel" type="Label" parent="Curtain/InformationPanel"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_top = 106.0
+offset_right = 560.0
+offset_bottom = 142.0
+theme_override_colors/font_color = Color(0.79, 0.58, 0.86, 1)
+theme_override_font_sizes/font_size = 20
+text = "(Guardião das Profundezas) — MINICHEFE"
+
+[node name="DescriptionLabel" type="Label" parent="Curtain/InformationPanel"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_top = 166.0
+offset_right = 550.0
+offset_bottom = 280.0
+theme_override_colors/font_color = Color(0.91, 0.93, 0.94, 1)
+theme_override_font_sizes/font_size = 18
+text = "Uma sentinela ancestral que protege a passagem submersa. Seus avanços esmagam tudo que permanece em seu caminho."
+autowrap_mode = 2
+
+[node name="WarningLabel" type="Label" parent="Curtain/InformationPanel"]
+layout_mode = 0
+offset_top = 292.0
+offset_right = 550.0
+offset_bottom = 326.0
+theme_override_colors/font_color = Color(1, 0.72, 0.76, 1)
+theme_override_font_sizes/font_size = 15
+text = "ATENÇÃO: observe a área marcada antes do dash."

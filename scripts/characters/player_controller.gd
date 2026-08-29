@@ -4,6 +4,8 @@ signal action_used(action_name: String, cooldown: float)
 signal health_changed(current: float, maximum: float)
 signal died
 
+const SPRINT_MULTIPLIER := 1.55
+
 @onready var body: Polygon2D = %Body
 @onready var shadow: Polygon2D = %Shadow
 @onready var health_component: Node = %HealthComponent
@@ -19,6 +21,8 @@ var _dead := false
 var _dash_direction := Vector2.DOWN
 var _knockback_velocity := Vector2.ZERO
 var _arena: Node2D
+var _controls_enabled := true
+var _base_collision_mask := 0
 
 
 ## Recebe o perfil selecionado antes ou depois da entrada do jogador na árvore da cena.
@@ -31,6 +35,7 @@ func setup(character_profile: Dictionary) -> void:
 ## Conecta vida, registra o grupo do jogador, encontra a arena e aplica os atributos escolhidos.
 func _ready() -> void:
 	add_to_group("player")
+	_base_collision_mask = collision_mask
 	_arena = get_tree().get_first_node_in_group("walkable_area") as Node2D
 	if profile.is_empty():
 		profile = GameState.get_selected_profile()
@@ -43,7 +48,7 @@ func _ready() -> void:
 
 ## Lê movimento em oito direções, processa dash/recuo, limita ao mapa e recebe ações.
 func _physics_process(delta: float) -> void:
-	if _dead:
+	if _dead or not _controls_enabled:
 		velocity = Vector2.ZERO
 		return
 
@@ -54,7 +59,8 @@ func _physics_process(delta: float) -> void:
 	if _dashing:
 		velocity = _dash_direction * 760.0
 	else:
-		velocity = input_vector.normalized() * float(profile.speed) + _knockback_velocity
+		var sprint_multiplier := SPRINT_MULTIPLIER if Input.is_action_pressed("sprint") else 1.0
+		velocity = input_vector.normalized() * float(profile.speed) * sprint_multiplier + _knockback_velocity
 	_knockback_velocity = _knockback_velocity.move_toward(Vector2.ZERO, 850.0 * delta)
 
 	var previous_position := global_position
@@ -109,6 +115,18 @@ func heal_full() -> void:
 ## Expõe a morte imediata ao HUD de debug.
 func debug_kill() -> void:
 	health_component.kill()
+
+
+## Permite que diálogos e apresentações cinematográficas suspendam o controle sem pausar o mundo.
+func set_controls_enabled(enabled: bool) -> void:
+	_controls_enabled = enabled and not _dead
+	if not _controls_enabled:
+		velocity = Vector2.ZERO
+
+
+## Informa se o modificador de corrida está pressionado para HUD e testes.
+func is_sprinting() -> bool:
+	return _controls_enabled and not _dashing and Input.is_action_pressed("sprint")
 
 
 ## Escolhe a habilidade do perfil, emite cooldown e impede uso repetido até ela recarregar.
@@ -167,10 +185,11 @@ func _animate_shoot() -> void:
 	tween.tween_property(body, "scale", Vector2.ONE, 0.08)
 
 
-## Ativa movimento veloz, dano de contato e invulnerabilidade durante a investida.
+## Ativa movimento veloz e ignora somente a camada física dos inimigos pequenos durante o dash.
 func _animate_dash() -> void:
 	_dash_direction = facing
 	_dashing = true
+	set_collision_mask_value(2, false)
 	dash_hitbox.damage = float(profile.damage)
 	dash_hitbox.activate(0.17)
 	_spawn_trail()
@@ -179,6 +198,7 @@ func _animate_dash() -> void:
 	tween.tween_property(body, "modulate", Color(1.8, 1.8, 1.8, 1.0), 0.05)
 	await get_tree().create_timer(0.17).timeout
 	_dashing = false
+	collision_mask = _base_collision_mask
 	body.scale = Vector2.ONE
 	body.modulate = Color.WHITE
 
@@ -212,6 +232,7 @@ func _on_damaged(_amount: float, _source_position: Vector2) -> void:
 func _on_died() -> void:
 	_dead = true
 	_can_act = false
+	collision_mask = _base_collision_mask
 	velocity = Vector2.ZERO
 	body.modulate = Color("5d6872")
 	var tween := create_tween()

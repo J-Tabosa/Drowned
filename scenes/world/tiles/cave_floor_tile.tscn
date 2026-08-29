@@ -1,0 +1,19 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/cave_tile_placeholder.gd" id="1_tile"]
+
+[node name="CaveFloorTile" type="Node2D"]
+script = ExtResource("1_tile")
+tile_role = "floor"
+
+[node name="TopShape" type="Polygon2D" parent="."]
+unique_name_in_owner = true
+
+[node name="SideShape" type="Polygon2D" parent="."]
+unique_name_in_owner = true
+
+[node name="AccentShape" type="Polygon2D" parent="."]
+unique_name_in_owner = true
+
+[node name="GlowShape" type="Polygon2D" parent="."]
+unique_name_in_owner = true

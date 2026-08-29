@@ -12,7 +12,7 @@ func _wait_for_transition(overlay: Variant) -> void:
 		await process_frame
 
 
-## Valida três slots, roteiros por jogador, troca pelo monstro e fechamento do overlay.
+## Valida os três slots, a introdução sem criatura e o diálogo de revelação do chefe.
 func _run() -> void:
 	var game_state: Variant = root.get_node_or_null("GameState")
 	var dialogue_manager: Variant = root.get_node_or_null("DialogueManager")
@@ -21,11 +21,17 @@ func _run() -> void:
 	assert(dialogue_manager != null)
 	for profile in game_state.CHARACTER_PROFILES:
 		var candidate: Dictionary = catalog.get_intro(profile.id)
-		assert(candidate.actors.size() == 4)
+		assert(candidate.actors.size() == 3)
 		assert(candidate.initial_slots.size() == 3)
 		assert(candidate.initial_slots.center == "player")
 		assert(candidate.actors.player.id == profile.id)
-		assert(candidate.lines.size() == 7)
+		assert(candidate.lines.size() == 5)
+		assert(not candidate.actors.has("monster"))
+		assert(not candidate.actors.has("abyssal_creature"))
+		var boss_reveal: Dictionary = catalog.get_boss_reveal(profile.id)
+		assert(boss_reveal.actors.size() == 3)
+		assert(boss_reveal.lines.size() == 5)
+		assert(boss_reveal.lines[0].text == "O que raios é aquilo?")
 
 	var stage := Node2D.new()
 	root.add_child(stage)
@@ -48,13 +54,9 @@ func _run() -> void:
 		overlay._advance()
 		await _wait_for_transition(overlay)
 		assert(overlay._line_index == next_line_index)
-		if next_line_index == 4:
-			assert(overlay._slots.left == "")
-			assert(overlay._slots.center == "player")
-			assert(overlay._slots.right == "monster")
-			assert(not overlay.left_portrait.visible)
-			assert(overlay.center_portrait.visible)
-			assert(overlay.right_portrait.visible)
+		assert(overlay._slots.left == "friend_left")
+		assert(overlay._slots.center == "player")
+		assert(overlay._slots.right == "friend_right")
 
 	overlay._finish_typing()
 	overlay._advance()
