@@ -1,27 +1,28 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3 uid="uid://sigk8pk75kv3"]
 
-[ext_resource type="Script" path="res://scripts/world/node_cave_map.gd" id="1_cave"]
+[ext_resource type="Script" uid="uid://lct425yj625t" path="res://scripts/world/node_cave_map.gd" id="1_cave"]
 
-[node name="UnderwaterCave" type="Node2D"]
+[node name="UnderwaterCave" type="Node2D" unique_id=1973670332]
 script = ExtResource("1_cave")
+map_layout = "\n                                          c\n                                   ccccccccccccccc\n                                ccccccccccccccccccccc\n                              ccccccccccccccccccccccccc\n                            cccccccccMccccccccccccccccccc\n                           ccccccccccccccccccccccccccccccc\n                        ttcccccMccccccccccccMcccccccccccccc\n                     ttt111ccccccccccccccccccccccccMccccccc\n                    ttttttcCccccccccccccccccccccccccccccccc\n                  tttttttccccccccccccccccccccccccccccccccccc\n                 ttttt    ccccccccccccccccccccccccccccccccc\n                tTtL      ccccccccccccccccccccccccccccccccc\n               tttt       cccccccMcccccccccccccccMccccccccc\n              tttt         ccccccccccccccMcccccccccccccccc\n       s     tttt           ccccccccccccccccccccccccccccc\n    sssssss tttt              ccccccccccbcccccccccccccc\n   sssssssLttt                 cccccccbDbccccccccccc\n  sssssssssttt                     ccccbbbcccccccc\n  sssssssssst                          bbbc\n ssssssPssssss                         222\n  sssssssssss                          bbb\n  sLsssssssss                        bbbbbbb\n   sssssssss                       bbbbbbbbbbb\n    sssssss                        bbbbbbbbbbb\n       s                          bbbbbbBbbbbbb\n                                   bbbbbbbbbbb\n                                   bbbbbbbbbbb\n                                     bbbebbb\n                                       eee\n                                       333\n                                       eee\n                                       eEe\n                                        e"
 
-[node name="Background" type="ColorRect" parent="."]
+[node name="Background" type="ColorRect" parent="." unique_id=1427012683]
 unique_name_in_owner = true
+z_index = -20
 mouse_filter = 2
 color = Color(0.012, 0.037, 0.071, 1)
-z_index = -20
 
-[node name="FloorTiles" type="Node2D" parent="."]
+[node name="FloorTiles" type="Node2D" parent="." unique_id=707379667]
 unique_name_in_owner = true
 
-[node name="WallTiles" type="Node2D" parent="."]
+[node name="WallTiles" type="Node2D" parent="." unique_id=1764289606]
 unique_name_in_owner = true
 
-[node name="GateTiles" type="Node2D" parent="."]
+[node name="GateTiles" type="Node2D" parent="." unique_id=1554257163]
 unique_name_in_owner = true
 
-[node name="Props" type="Node2D" parent="."]
+[node name="Props" type="Node2D" parent="." unique_id=1943888566]
 unique_name_in_owner = true
 
-[node name="Markers" type="Node2D" parent="."]
+[node name="Markers" type="Node2D" parent="." unique_id=1028231898]
 unique_name_in_owner = true

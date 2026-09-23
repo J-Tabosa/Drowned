@@ -46,6 +46,36 @@ static func get_intro(character_id: String) -> Dictionary:
 	)
 
 
+## Pequenos achados no ritmo da exploração, sem transformar o tutorial em um bloco de texto.
+static func get_exploration_echo(character_id: String, echo_index: int) -> Dictionary:
+	var player := _profile(character_id)
+	var companion := {}
+	for profile in GameState.CHARACTER_PROFILES:
+		if profile.id != character_id:
+			companion = _profile(profile.id)
+			break
+	var conversations := [
+		[
+			{"actor": "companion", "text": "Essas marcas não são naturais. Alguém tentou indicar um caminho antes de nós."},
+			{"actor": "player", "text": "Então seguimos os sinais, mas sem baixar a guarda."},
+		],
+		[
+			{"actor": "player", "text": "Pegadas recentes. Elas entram na câmara, mas nenhuma volta."},
+			{"actor": "companion", "text": "Os ruídos estão mais próximos. Seja o que for, já sabe que chegamos."},
+		],
+		[
+			{"actor": "companion", "text": "O selo está ligado à passagem. As criaturas devem estar mantendo o portão fechado."},
+			{"actor": "player", "text": "Limpamos a câmara e seguimos até a fonte desse lugar."},
+		],
+	]
+	var safe_index := clampi(echo_index, 0, conversations.size() - 1)
+	return _build_sequence(
+		{"player": player, "companion": companion},
+		{"center": "player", "right": "companion"},
+		conversations[safe_index]
+	)
+
+
 ## Monta o diálogo disparado após os mobs, enquanto a câmera revela o mini-chefe.
 static func get_boss_reveal(character_id: String) -> Dictionary:
 	var player := _profile(character_id)
@@ -99,7 +129,7 @@ static func _profile(character_id: String) -> Dictionary:
 				"id": profile.id,
 				"name": profile.name,
 				"color": profile.color,
-				"portrait": null,
+				"portrait": profile.get("portrait", ""),
 			}
 	return {}
 

@@ -1,8 +1,9 @@
 extends Node2D
 
-## Cada caractere abaixo vira um tile-nó. Para redesenhar o mapa, edite apenas este desenho.
+## O layout principal fica na cena e pode ser editado pelo Inspector.
+## Cada caractere do layout vira um tile-nó.
 ## Legenda: s spawn, t tutorial, c combate, b mini-chefe, e saída.
-## P jogador, T marco tutorial, C gatilho combate, M inimigos, B chefe, D foco da câmera.
+## P jogador, T marco tutorial, L eco narrativo, C gatilho combate, M inimigos, B chefe, D foco da câmera.
 ## 1 portão do tutorial, 2 portão do chefe, 3 portão pós-chefe.
 const MAP_BLUEPRINT := [
 	"",
@@ -17,17 +18,17 @@ const MAP_BLUEPRINT := [
 	"                    ttttttcCccccccccccccccccccccccccccccccc",
 	"                  tttttttccccccccccccccccccccccccccccccccccc",
 	"                 ttttt    ccccccccccccccccccccccccccccccccc",
-	"                tTtt      ccccccccccccccccccccccccccccccccc",
+	"                tTtL      ccccccccccccccccccccccccccccccccc",
 	"               tttt       cccccccMcccccccccccccccMccccccccc",
 	"              tttt         ccccccccccccccMcccccccccccccccc",
 	"       s     tttt           ccccccccccccccccccccccccccccc",
 	"    sssssss tttt              ccccccccccbcccccccccccccc",
 	"   sssssssssttt                 cccccccbDbccccccccccc",
-	"  sssssssssttt                     ccccbbbcccccccc",
+	"  sssssssLttt                     ccccbbbcccccccc",
 	"  sssssssssst                          bbbc",
 	" ssssssPssssss                         222",
 	"  sssssssssss                          bbb",
-	"  sssssssssss                        bbbbbbb",
+	"  sLsssssssss                        bbbbbbb",
 	"   sssssssss                       bbbbbbbbbbb",
 	"    sssssss                        bbbbbbbbbbb",
 	"       s                          bbbbbbBbbbbbb",
@@ -49,6 +50,7 @@ const MAP_ORIGIN := Vector2(256, 192)
 @export var wall_tile_scene: PackedScene = preload("res://scenes/world/tiles/cave_wall_tile.tscn")
 @export var gate_tile_scene: PackedScene = preload("res://scenes/world/tiles/cave_gate_tile.tscn")
 @export var prop_tile_scene: PackedScene = preload("res://scenes/world/tiles/cave_prop_tile.tscn")
+@export_multiline var map_layout := ""
 
 @onready var background: ColorRect = %Background
 @onready var floor_tiles: Node2D = %FloorTiles
@@ -60,6 +62,8 @@ const MAP_ORIGIN := Vector2(256, 192)
 var _floor_cells: Dictionary = {}
 var _anchors: Dictionary = {}
 var _mob_anchors: Array[Vector2] = []
+var _story_echo_anchors: Array[Vector2] = []
+var _story_echo_nodes: Array[Polygon2D] = []
 var _gate_nodes: Dictionary = {
 	"tutorial": [],
 	"boss": [],
@@ -72,23 +76,37 @@ var _gate_open := {
 }
 var _world_rect := Rect2()
 var _max_columns := 0
+var _map_rows: Array = []
 
 
 ## Constrói o mapa inteiro como nós editáveis a partir do blueprint e registra seus marcadores.
 func _ready() -> void:
 	add_to_group("walkable_area")
+	_map_rows = _get_map_rows()
 	_build_floor_and_anchors()
+	for echo_index in _story_echo_nodes.size():
+		_story_echo_nodes[echo_index].visible = echo_index == 0
 	_build_boundary_walls()
-	_world_rect = Rect2(Vector2.ZERO, Vector2(_max_columns * TILE_STEP.x + 512, MAP_BLUEPRINT.size() * TILE_STEP.y + 384))
+	_world_rect = Rect2(Vector2.ZERO, Vector2(_max_columns * TILE_STEP.x + 512, _map_rows.size() * TILE_STEP.y + 384))
 	background.position = _world_rect.position
 	background.size = _world_rect.size
+
+
+## Usa o layout salvo na cena e mantém um fallback para cenas antigas do protótipo.
+func _get_map_rows() -> Array:
+	if map_layout.strip_edges().is_empty():
+		return MAP_BLUEPRINT
+	var rows: Array = []
+	for row in map_layout.split("\n", true):
+		rows.append(row)
+	return rows
 
 
 ## Instancia um nó de piso para cada caractere e converte letras especiais em marcadores nomeados.
 func _build_floor_and_anchors() -> void:
 	var mob_index := 0
-	for row_index in MAP_BLUEPRINT.size():
-		var row_text: String = MAP_BLUEPRINT[row_index]
+	for row_index in _map_rows.size():
+		var row_text: String = _map_rows[row_index]
 		_max_columns = maxi(_max_columns, row_text.length())
 		for column_index in row_text.length():
 			var symbol := row_text.substr(column_index, 1)
@@ -113,6 +131,10 @@ func _build_floor_and_anchors() -> void:
 				mob_index += 1
 			elif symbol == "P":
 				_register_anchor("player_spawn", _cell_to_local(cell))
+			elif symbol == "L":
+				var echo_position := _cell_to_local(cell)
+				_story_echo_anchors.push_front(echo_position)
+				_story_echo_nodes.push_front(_spawn_story_echo(echo_position))
 			elif symbol == "T":
 				_register_anchor("tutorial_focus", _cell_to_local(cell))
 			elif symbol == "C":
@@ -181,6 +203,24 @@ func _register_anchor(anchor_name: String, local_anchor_position: Vector2) -> vo
 	_anchors[anchor_name] = local_anchor_position
 
 
+## Desenha um pequeno losango luminoso para os pontos narrativos do prólogo.
+func _spawn_story_echo(local_echo_position: Vector2) -> Polygon2D:
+	var echo := Polygon2D.new()
+	echo.name = "StoryEcho"
+	echo.position = local_echo_position
+	echo.z_index = 4
+	echo.color = Color(0.28, 0.94, 0.78, 0.82)
+	echo.polygon = PackedVector2Array([
+		Vector2(0, -28), Vector2(24, 0), Vector2(0, 28), Vector2(-24, 0),
+	])
+	markers.add_child(echo)
+	var pulse := echo.create_tween().set_loops()
+	pulse.tween_property(echo, "scale", Vector2(1.22, 1.22), 0.65).set_trans(Tween.TRANS_SINE)
+	pulse.tween_property(echo, "scale", Vector2.ONE, 0.65).set_trans(Tween.TRANS_SINE)
+	echo.set_meta("pulse_tween", pulse)
+	return echo
+
+
 ## Converte coluna e linha do blueprint em posição visual de grade isométrica escalonada.
 func _cell_to_local(cell: Vector2i) -> Vector2:
 	var row_shift := TILE_STEP.x * 0.5 if cell.y % 2 != 0 else 0.0
@@ -211,6 +251,21 @@ func is_walkable(world_position: Vector2, margin := 26.0) -> bool:
 		if not _is_point_on_open_floor(local_point + sample_offset):
 			return false
 	return true
+
+
+## Percorre o trajeto em passos curtos e para antes da primeira parede ou portão fechado.
+func get_farthest_walkable_position(from_world: Vector2, to_world: Vector2, margin := 26.0) -> Vector2:
+	var distance := from_world.distance_to(to_world)
+	if distance <= 0.01:
+		return from_world
+	var direction := (to_world - from_world) / distance
+	var last_walkable := from_world
+	for step in range(12, ceili(distance) + 12, 12):
+		var candidate := from_world + direction * minf(float(step), distance)
+		if not is_walkable(candidate, margin):
+			break
+		last_walkable = candidate
+	return last_walkable
 
 
 ## Localiza o losango sob um ponto e rejeita especificamente tiles de portões fechados.
@@ -249,6 +304,36 @@ func get_mob_spawn_positions() -> Array[Vector2]:
 	for local_position in _mob_anchors:
 		positions.append(to_global(local_position))
 	return positions
+
+
+## Retorna os ecos do prólogo na ordem natural de exploração, do naufrágio à câmara.
+func get_story_echo_positions() -> Array[Vector2]:
+	var positions: Array[Vector2] = []
+	for local_position in _story_echo_anchors:
+		positions.append(to_global(local_position))
+	return positions
+
+
+## Apaga o brilho já investigado para deixar claro qual é o próximo destino.
+func complete_story_echo(index: int) -> void:
+	if index < 0 or index >= _story_echo_nodes.size():
+		return
+	var echo := _story_echo_nodes[index]
+	if not is_instance_valid(echo):
+		return
+	var pulse_tween: Tween = echo.get_meta("pulse_tween") as Tween
+	if pulse_tween:
+		pulse_tween.kill()
+	var fade := echo.create_tween().set_parallel(true)
+	fade.tween_property(echo, "scale", Vector2(1.7, 1.7), 0.24)
+	fade.tween_property(echo, "modulate:a", 0.0, 0.24)
+	fade.chain().tween_callback(echo.queue_free)
+	var next_index := index + 1
+	if next_index < _story_echo_nodes.size():
+		var next_echo := _story_echo_nodes[next_index]
+		next_echo.modulate.a = 0.0
+		next_echo.visible = true
+		next_echo.create_tween().tween_property(next_echo, "modulate:a", 1.0, 0.28)
 
 
 ## Expõe contagens do mapa para testes e ferramentas do editor.
@@ -301,7 +386,7 @@ func _set_gate_open(gate_id: String, is_open: bool) -> void:
 
 ## Define a paleta de cada caractere semântico do blueprint.
 func _region_for_symbol(symbol: String) -> String:
-	if symbol in ["s", "P"]:
+	if symbol in ["s", "P", "L"]:
 		return "spawn"
 	if symbol in ["t", "T", "1"]:
 		return "tutorial"
@@ -329,6 +414,6 @@ func _gate_id_for_symbol(symbol: String) -> String:
 
 ## Espalha props de forma determinística sem exigir posições manuais.
 func _should_spawn_prop(cell: Vector2i, symbol: String) -> bool:
-	if symbol in ["P", "T", "C", "M", "D", "B", "E", "1", "2", "3"]:
+	if symbol in ["P", "T", "L", "C", "M", "D", "B", "E", "1", "2", "3"]:
 		return false
 	return absi(cell.x * 31 + cell.y * 17) % 19 == 0

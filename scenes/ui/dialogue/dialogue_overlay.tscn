@@ -1,8 +1,12 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene format=3 uid="uid://cl6hmarcnqwkw"]
 
-[ext_resource type="Script" path="res://scripts/narrative/dialogue_overlay.gd" id="1_overlay"]
+[ext_resource type="Script" uid="uid://cw4k2oaas1be" path="res://scripts/narrative/dialogue_overlay.gd" id="1_overlay"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_dialogue"]
+content_margin_left = 22.0
+content_margin_top = 16.0
+content_margin_right = 22.0
+content_margin_bottom = 14.0
 bg_color = Color(0.025, 0.035, 0.047, 0.97)
 border_width_left = 3
 border_width_top = 3
@@ -13,17 +17,13 @@ corner_radius_top_left = 5
 corner_radius_top_right = 5
 corner_radius_bottom_right = 5
 corner_radius_bottom_left = 5
-content_margin_left = 22.0
-content_margin_top = 16.0
-content_margin_right = 22.0
-content_margin_bottom = 14.0
 
-[node name="DialogueOverlay" type="CanvasLayer"]
+[node name="DialogueOverlay" type="CanvasLayer" unique_id=535848597]
 process_mode = 3
 layer = 100
 script = ExtResource("1_overlay")
 
-[node name="Curtain" type="Control" parent="."]
+[node name="Curtain" type="Control" parent="." unique_id=707649147]
 unique_name_in_owner = true
 layout_mode = 3
 anchors_preset = 15
@@ -31,9 +31,8 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-mouse_filter = 0
 
-[node name="Dimmer" type="ColorRect" parent="Curtain"]
+[node name="Dimmer" type="ColorRect" parent="Curtain" unique_id=306412128]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 15
@@ -41,31 +40,28 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0, 0.025, 0.04, 0.48)
 mouse_filter = 2
+color = Color(0, 0.025, 0.04, 0.48)
 
-[node name="TopBar" type="ColorRect" parent="Curtain"]
+[node name="TopBar" type="ColorRect" parent="Curtain" unique_id=279572245]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_bottom = 74.0
+offset_bottom = 16.0
 grow_horizontal = 2
-color = Color(0.005, 0.008, 0.012, 1)
 mouse_filter = 2
+color = Color(0.005, 0.008, 0.012, 1)
 
-[node name="TopAccent" type="ColorRect" parent="Curtain/TopBar"]
+[node name="TopAccent" type="ColorRect" parent="Curtain/TopBar" unique_id=987730092]
 layout_mode = 1
-anchors_preset = 12
-anchor_top = 1.0
+anchors_preset = 10
 anchor_right = 1.0
-anchor_bottom = 1.0
-offset_top = -4.0
+offset_bottom = 4.0
 grow_horizontal = 2
-grow_vertical = 0
 color = Color(0.25, 0.78, 0.84, 0.85)
 
-[node name="BottomBar" type="ColorRect" parent="Curtain"]
+[node name="BottomBar" type="ColorRect" parent="Curtain" unique_id=477660769]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 12
@@ -75,10 +71,10 @@ anchor_bottom = 1.0
 offset_top = -74.0
 grow_horizontal = 2
 grow_vertical = 0
-color = Color(0.005, 0.008, 0.012, 1)
 mouse_filter = 2
+color = Color(0.005, 0.008, 0.012, 1)
 
-[node name="BottomAccent" type="ColorRect" parent="Curtain/BottomBar"]
+[node name="BottomAccent" type="ColorRect" parent="Curtain/BottomBar" unique_id=1266568757]
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
@@ -86,9 +82,9 @@ offset_bottom = 4.0
 grow_horizontal = 2
 color = Color(0.91, 0.36, 0.46, 0.85)
 
-[node name="LeftPortrait" type="Control" parent="Curtain"]
+[node name="LeftPortrait" type="Control" parent="Curtain" unique_id=804447383]
 unique_name_in_owner = true
-layout_mode = 0
+anchors_preset = 0
 offset_left = 20.0
 offset_top = 92.0
 offset_right = 360.0
@@ -96,7 +92,7 @@ offset_bottom = 548.0
 pivot_offset = Vector2(170, 228)
 mouse_filter = 2
 
-[node name="LeftPlaceholder" type="Control" parent="Curtain/LeftPortrait"]
+[node name="LeftPlaceholder" type="Control" parent="Curtain/LeftPortrait" unique_id=211449289]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 15
@@ -106,7 +102,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="LeftShadow" type="ColorRect" parent="Curtain/LeftPortrait/LeftPlaceholder"]
+[node name="LeftShadow" type="ColorRect" parent="Curtain/LeftPortrait/LeftPlaceholder" unique_id=770669502]
 layout_mode = 0
 offset_left = 74.0
 offset_top = 423.0
@@ -114,7 +110,7 @@ offset_right = 273.0
 offset_bottom = 445.0
 color = Color(0, 0, 0, 0.42)
 
-[node name="LeftHead" type="ColorRect" parent="Curtain/LeftPortrait/LeftPlaceholder"]
+[node name="LeftHead" type="ColorRect" parent="Curtain/LeftPortrait/LeftPlaceholder" unique_id=1470363345]
 unique_name_in_owner = true
 layout_mode = 0
 offset_left = 124.0
@@ -123,7 +119,7 @@ offset_right = 216.0
 offset_bottom = 108.0
 color = Color(0.98, 0.45, 0.52, 1)
 
-[node name="LeftBody" type="ColorRect" parent="Curtain/LeftPortrait/LeftPlaceholder"]
+[node name="LeftBody" type="ColorRect" parent="Curtain/LeftPortrait/LeftPlaceholder" unique_id=1873566586]
 unique_name_in_owner = true
 layout_mode = 0
 offset_left = 95.0
@@ -132,7 +128,7 @@ offset_right = 245.0
 offset_bottom = 426.0
 color = Color(0.91, 0.36, 0.46, 1)
 
-[node name="LeftArm" type="ColorRect" parent="Curtain/LeftPortrait/LeftPlaceholder"]
+[node name="LeftArm" type="ColorRect" parent="Curtain/LeftPortrait/LeftPlaceholder" unique_id=1228739498]
 unique_name_in_owner = true
 layout_mode = 0
 offset_left = 51.0
@@ -142,8 +138,9 @@ offset_bottom = 367.0
 rotation = 0.12
 color = Color(0.75, 0.23, 0.34, 1)
 
-[node name="LeftTexture" type="TextureRect" parent="Curtain/LeftPortrait"]
+[node name="LeftTexture" type="TextureRect" parent="Curtain/LeftPortrait" unique_id=1594031135]
 unique_name_in_owner = true
+texture_filter = 1
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -154,9 +151,9 @@ mouse_filter = 2
 expand_mode = 1
 stretch_mode = 5
 
-[node name="CenterPortrait" type="Control" parent="Curtain"]
+[node name="CenterPortrait" type="Control" parent="Curtain" unique_id=728547886]
 unique_name_in_owner = true
-layout_mode = 0
+anchors_preset = 0
 offset_left = 406.0
 offset_top = 92.0
 offset_right = 746.0
@@ -164,7 +161,7 @@ offset_bottom = 548.0
 pivot_offset = Vector2(170, 228)
 mouse_filter = 2
 
-[node name="CenterPlaceholder" type="Control" parent="Curtain/CenterPortrait"]
+[node name="CenterPlaceholder" type="Control" parent="Curtain/CenterPortrait" unique_id=301783394]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 15
@@ -174,7 +171,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="CenterShadow" type="ColorRect" parent="Curtain/CenterPortrait/CenterPlaceholder"]
+[node name="CenterShadow" type="ColorRect" parent="Curtain/CenterPortrait/CenterPlaceholder" unique_id=777676309]
 layout_mode = 0
 offset_left = 70.0
 offset_top = 423.0
@@ -182,7 +179,7 @@ offset_right = 270.0
 offset_bottom = 445.0
 color = Color(0, 0, 0, 0.42)
 
-[node name="CenterHead" type="ColorRect" parent="Curtain/CenterPortrait/CenterPlaceholder"]
+[node name="CenterHead" type="ColorRect" parent="Curtain/CenterPortrait/CenterPlaceholder" unique_id=1109146282]
 unique_name_in_owner = true
 layout_mode = 0
 offset_left = 124.0
@@ -191,7 +188,7 @@ offset_right = 216.0
 offset_bottom = 108.0
 color = Color(0.35, 0.84, 0.88, 1)
 
-[node name="CenterBody" type="ColorRect" parent="Curtain/CenterPortrait/CenterPlaceholder"]
+[node name="CenterBody" type="ColorRect" parent="Curtain/CenterPortrait/CenterPlaceholder" unique_id=300975599]
 unique_name_in_owner = true
 layout_mode = 0
 offset_left = 95.0
@@ -200,7 +197,7 @@ offset_right = 245.0
 offset_bottom = 426.0
 color = Color(0.25, 0.78, 0.84, 1)
 
-[node name="CenterArm" type="ColorRect" parent="Curtain/CenterPortrait/CenterPlaceholder"]
+[node name="CenterArm" type="ColorRect" parent="Curtain/CenterPortrait/CenterPlaceholder" unique_id=1488178414]
 unique_name_in_owner = true
 layout_mode = 0
 offset_left = 51.0
@@ -210,8 +207,9 @@ offset_bottom = 367.0
 rotation = 0.08
 color = Color(0.12, 0.61, 0.69, 1)
 
-[node name="CenterTexture" type="TextureRect" parent="Curtain/CenterPortrait"]
+[node name="CenterTexture" type="TextureRect" parent="Curtain/CenterPortrait" unique_id=1581998485]
 unique_name_in_owner = true
+texture_filter = 1
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -222,9 +220,9 @@ mouse_filter = 2
 expand_mode = 1
 stretch_mode = 5
 
-[node name="RightPortrait" type="Control" parent="Curtain"]
+[node name="RightPortrait" type="Control" parent="Curtain" unique_id=118700430]
 unique_name_in_owner = true
-layout_mode = 0
+anchors_preset = 0
 offset_left = 792.0
 offset_top = 92.0
 offset_right = 1132.0
@@ -232,7 +230,7 @@ offset_bottom = 548.0
 pivot_offset = Vector2(170, 228)
 mouse_filter = 2
 
-[node name="RightPlaceholder" type="Control" parent="Curtain/RightPortrait"]
+[node name="RightPlaceholder" type="Control" parent="Curtain/RightPortrait" unique_id=244752864]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 15
@@ -242,7 +240,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="RightShadow" type="ColorRect" parent="Curtain/RightPortrait/RightPlaceholder"]
+[node name="RightShadow" type="ColorRect" parent="Curtain/RightPortrait/RightPlaceholder" unique_id=1464472852]
 layout_mode = 0
 offset_left = 67.0
 offset_top = 423.0
@@ -250,7 +248,7 @@ offset_right = 266.0
 offset_bottom = 445.0
 color = Color(0, 0, 0, 0.42)
 
-[node name="RightHead" type="ColorRect" parent="Curtain/RightPortrait/RightPlaceholder"]
+[node name="RightHead" type="ColorRect" parent="Curtain/RightPortrait/RightPlaceholder" unique_id=528813394]
 unique_name_in_owner = true
 layout_mode = 0
 offset_left = 124.0
@@ -259,7 +257,7 @@ offset_right = 216.0
 offset_bottom = 108.0
 color = Color(1, 0.78, 0.3, 1)
 
-[node name="RightBody" type="ColorRect" parent="Curtain/RightPortrait/RightPlaceholder"]
+[node name="RightBody" type="ColorRect" parent="Curtain/RightPortrait/RightPlaceholder" unique_id=619328353]
 unique_name_in_owner = true
 layout_mode = 0
 offset_left = 95.0
@@ -268,7 +266,7 @@ offset_right = 245.0
 offset_bottom = 426.0
 color = Color(0.96, 0.73, 0.26, 1)
 
-[node name="RightArm" type="ColorRect" parent="Curtain/RightPortrait/RightPlaceholder"]
+[node name="RightArm" type="ColorRect" parent="Curtain/RightPortrait/RightPlaceholder" unique_id=731228258]
 unique_name_in_owner = true
 layout_mode = 0
 offset_left = 244.0
@@ -278,8 +276,9 @@ offset_bottom = 367.0
 rotation = -0.12
 color = Color(0.78, 0.55, 0.12, 1)
 
-[node name="RightTexture" type="TextureRect" parent="Curtain/RightPortrait"]
+[node name="RightTexture" type="TextureRect" parent="Curtain/RightPortrait" unique_id=576484794]
 unique_name_in_owner = true
+texture_filter = 1
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -291,14 +290,16 @@ expand_mode = 1
 stretch_mode = 5
 flip_h = true
 
-[node name="DialogueAccent" type="Polygon2D" parent="Curtain"]
+[node name="DialogueAccent" type="Polygon2D" parent="Curtain" unique_id=914004536]
 unique_name_in_owner = true
+z_index = 9
 position = Vector2(137, 415)
 color = Color(0.91, 0.36, 0.46, 0.95)
 polygon = PackedVector2Array(0, 20, 46, 0, 900, 0, 872, 174, 20, 174)
 
-[node name="DialogueBox" type="PanelContainer" parent="Curtain"]
+[node name="DialogueBox" type="PanelContainer" parent="Curtain" unique_id=689915616]
 unique_name_in_owner = true
+z_index = 10
 layout_mode = 0
 offset_left = 151.0
 offset_top = 426.0
@@ -306,17 +307,17 @@ offset_right = 1001.0
 offset_bottom = 574.0
 theme_override_styles/panel = SubResource("StyleBox_dialogue")
 
-[node name="Content" type="VBoxContainer" parent="Curtain/DialogueBox"]
+[node name="Content" type="VBoxContainer" parent="Curtain/DialogueBox" unique_id=90669975]
 layout_mode = 2
 theme_override_constants/separation = 7
 
-[node name="SpeakerLabel" type="Label" parent="Curtain/DialogueBox/Content"]
+[node name="SpeakerLabel" type="Label" parent="Curtain/DialogueBox/Content" unique_id=505684739]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 21
 text = "Personagem"
 
-[node name="DialogueLabel" type="Label" parent="Curtain/DialogueBox/Content"]
+[node name="DialogueLabel" type="Label" parent="Curtain/DialogueBox/Content" unique_id=1411628443]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 67)
 layout_mode = 2
@@ -325,7 +326,7 @@ theme_override_font_sizes/font_size = 18
 text = "Texto do diálogo"
 autowrap_mode = 2
 
-[node name="ContinueIndicator" type="Label" parent="Curtain/DialogueBox/Content"]
+[node name="ContinueIndicator" type="Label" parent="Curtain/DialogueBox/Content" unique_id=1678495203]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.25, 0.78, 0.84, 1)

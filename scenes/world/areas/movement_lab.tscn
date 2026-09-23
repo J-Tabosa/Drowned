@@ -1,10 +1,12 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://scripts/world/tile_cave_lab.gd" id="1_lab"]
 [ext_resource type="PackedScene" path="res://scenes/world/areas/underwater_cave.tscn" id="2_cave"]
 [ext_resource type="PackedScene" path="res://scenes/ui/hud/boss_intro_card.tscn" id="3_boss_card"]
+[ext_resource type="PackedScene" path="res://scenes/world/effects/underwater_fog.tscn" id="4_fog"]
 
 [node name="MovementLab" type="Node2D"]
+process_mode = 3
 script = ExtResource("1_lab")
 
 [node name="Arena" parent="." instance=ExtResource("2_cave")]
@@ -22,105 +24,260 @@ position_smoothing_speed = 5.0
 [node name="BossIntroCard" parent="." instance=ExtResource("3_boss_card")]
 unique_name_in_owner = true
 
+[node name="UnderwaterFog" parent="." instance=ExtResource("4_fog")]
+unique_name_in_owner = true
+
 [node name="Interface" type="CanvasLayer" parent="."]
+layer = 2
+
+[node name="PausePanel" type="ColorRect" parent="Interface"]
+process_mode = 3
+unique_name_in_owner = true
+visible = false
+z_index = 50
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_right = 0.0
+offset_bottom = 0.0
+mouse_filter = 0
+color = Color(0.005, 0.02, 0.04, 0.84)
+
+[node name="PauseCard" type="ColorRect" parent="Interface/PausePanel"]
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = -204.0
+offset_right = 200.0
+offset_bottom = 204.0
+color = Color(0.025, 0.082, 0.129, 0.98)
+
+[node name="PauseTitle" type="Label" parent="Interface/PausePanel/PauseCard"]
+offset_left = 24.0
+offset_top = 24.0
+offset_right = 376.0
+offset_bottom = 60.0
+theme_override_font_sizes/font_size = 28
+text = "JOGO PAUSADO"
+horizontal_alignment = 1
+
+[node name="PauseHint" type="Label" parent="Interface/PausePanel/PauseCard"]
+offset_left = 24.0
+offset_top = 66.0
+offset_right = 376.0
+offset_bottom = 94.0
+theme_override_colors/font_color = Color(0.72, 0.81, 0.86, 1)
+text = "Escolha uma opção"
+horizontal_alignment = 1
+
+[node name="Resume" type="Button" parent="Interface/PausePanel/PauseCard"]
+unique_name_in_owner = true
+offset_left = 70.0
+offset_top = 112.0
+offset_right = 330.0
+offset_bottom = 154.0
+text = "Continuar"
+
+[node name="Restart" type="Button" parent="Interface/PausePanel/PauseCard"]
+unique_name_in_owner = true
+offset_left = 70.0
+offset_top = 164.0
+offset_right = 330.0
+offset_bottom = 206.0
+text = "Reiniciar sala"
+
+[node name="Settings" type="Button" parent="Interface/PausePanel/PauseCard"]
+unique_name_in_owner = true
+offset_left = 70.0
+offset_top = 216.0
+offset_right = 330.0
+offset_bottom = 258.0
+text = "Configurações"
+
+[node name="ChangeCharacter" type="Button" parent="Interface/PausePanel/PauseCard"]
+unique_name_in_owner = true
+offset_left = 70.0
+offset_top = 268.0
+offset_right = 330.0
+offset_bottom = 310.0
+text = "Voltar à seleção"
+
+[node name="SettingsCard" type="ColorRect" parent="Interface/PausePanel"]
+unique_name_in_owner = true
+visible = false
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -174.0
+offset_top = -148.0
+offset_right = 174.0
+offset_bottom = 148.0
+color = Color(0.035, 0.105, 0.16, 1)
+
+[node name="SettingsTitle" type="Label" parent="Interface/PausePanel/SettingsCard"]
+offset_left = 20.0
+offset_top = 20.0
+offset_right = 328.0
+offset_bottom = 52.0
+theme_override_font_sizes/font_size = 21
+text = "CONFIGURAÇÕES"
+horizontal_alignment = 1
+
+[node name="Fullscreen" type="Button" parent="Interface/PausePanel/SettingsCard"]
+unique_name_in_owner = true
+offset_left = 44.0
+offset_top = 82.0
+offset_right = 304.0
+offset_bottom = 126.0
+text = "Alternar tela cheia"
+
+[node name="SettingsInfo" type="Label" parent="Interface/PausePanel/SettingsCard"]
+offset_left = 24.0
+offset_top = 177.0
+offset_right = 324.0
+offset_bottom = 210.0
+theme_override_colors/font_color = Color(0.72, 0.81, 0.86, 1)
+text = "F11 também alterna a tela cheia."
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="FogToggle" type="CheckButton" parent="Interface/PausePanel/SettingsCard"]
+unique_name_in_owner = true
+offset_left = 44.0
+offset_top = 131.0
+offset_right = 304.0
+offset_bottom = 172.0
+button_pressed = true
+text = "Névoa submarina"
+
+[node name="CloseSettings" type="Button" parent="Interface/PausePanel/SettingsCard"]
+unique_name_in_owner = true
+offset_left = 44.0
+offset_top = 218.0
+offset_right = 304.0
+offset_bottom = 262.0
+text = "Voltar"
 
 [node name="TopPanel" type="ColorRect" parent="Interface"]
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.0
+anchor_bottom = 0.0
 offset_left = 22.0
 offset_top = 18.0
-offset_right = 420.0
-offset_bottom = 142.0
+offset_right = 354.0
+offset_bottom = 112.0
 color = Color(0.025, 0.082, 0.129, 0.9)
+
+[node name="TopAccent" type="ColorRect" parent="Interface/TopPanel"]
+offset_right = 332.0
+offset_bottom = 3.0
+mouse_filter = 2
+color = Color(0.25, 0.78, 0.84, 0.92)
 
 [node name="CharacterLabel" type="Label" parent="Interface/TopPanel"]
 unique_name_in_owner = true
 offset_left = 18.0
-offset_top = 12.0
-offset_right = 378.0
-offset_bottom = 38.0
-theme_override_font_sizes/font_size = 19
+offset_top = 10.0
+offset_right = 314.0
+offset_bottom = 32.0
+theme_override_font_sizes/font_size = 16
 text = "Personagem"
 
 [node name="ActionLabel" type="Label" parent="Interface/TopPanel"]
 unique_name_in_owner = true
 offset_left = 18.0
-offset_top = 44.0
-offset_right = 378.0
-offset_bottom = 68.0
+offset_top = 34.0
+offset_right = 314.0
+offset_bottom = 54.0
 theme_override_colors/font_color = Color(0.72, 0.81, 0.86, 1)
+theme_override_font_sizes/font_size = 12
 text = "Espaço / clique: ação"
 
 [node name="HealthLabel" type="Label" parent="Interface/TopPanel"]
 unique_name_in_owner = true
 offset_left = 18.0
-offset_top = 70.0
-offset_right = 160.0
-offset_bottom = 91.0
+offset_top = 59.0
+offset_right = 132.0
+offset_bottom = 78.0
 theme_override_colors/font_color = Color(0.91, 0.36, 0.46, 1)
 theme_override_font_sizes/font_size = 13
 text = "VIDA  100 / 100"
 
 [node name="HealthBar" type="ProgressBar" parent="Interface/TopPanel"]
 unique_name_in_owner = true
-offset_left = 164.0
-offset_top = 73.0
-offset_right = 378.0
-offset_bottom = 87.0
+offset_left = 136.0
+offset_top = 62.0
+offset_right = 314.0
+offset_bottom = 75.0
 value = 100.0
 show_percentage = false
 
 [node name="CooldownBar" type="ProgressBar" parent="Interface/TopPanel"]
 unique_name_in_owner = true
 offset_left = 18.0
-offset_top = 104.0
-offset_right = 378.0
-offset_bottom = 112.0
+offset_top = 82.0
+offset_right = 314.0
+offset_bottom = 88.0
 value = 100.0
 show_percentage = false
 
 [node name="EnemyLabel" type="Label" parent="Interface"]
 unique_name_in_owner = true
-offset_left = 424.0
-offset_top = 22.0
-offset_right = 608.0
-offset_bottom = 54.0
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -156.0
+offset_top = 122.0
+offset_right = 156.0
+offset_bottom = 148.0
 theme_override_colors/font_color = Color(0.73, 0.55, 0.84, 1)
-theme_override_font_sizes/font_size = 17
+theme_override_font_sizes/font_size = 14
 text = "AMEAÇAS  0"
 horizontal_alignment = 1
 
-[node name="StageLabel" type="Label" parent="Interface"]
-unique_name_in_owner = true
-offset_left = 436.0
-offset_top = 51.0
-offset_right = 596.0
-offset_bottom = 76.0
-theme_override_colors/font_color = Color(0.4, 0.84, 0.76, 1)
-theme_override_font_sizes/font_size = 13
-text = "1/3  TREINAMENTO"
-horizontal_alignment = 1
-
 [node name="ObjectivePanel" type="ColorRect" parent="Interface"]
-offset_left = 716.0
-offset_top = 120.0
-offset_right = 1130.0
-offset_bottom = 194.0
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -354.0
+offset_top = 18.0
+offset_right = -22.0
+offset_bottom = 98.0
 color = Color(0.025, 0.082, 0.129, 0.9)
 
+[node name="ObjectiveAccent" type="ColorRect" parent="Interface/ObjectivePanel"]
+offset_right = 332.0
+offset_bottom = 3.0
+mouse_filter = 2
+color = Color(0.31, 0.81, 0.7, 0.92)
+
 [node name="ObjectiveCaption" type="Label" parent="Interface/ObjectivePanel"]
+visible = false
 offset_left = 14.0
-offset_top = 8.0
-offset_right = 400.0
-offset_bottom = 28.0
+offset_top = 7.0
+offset_right = 318.0
+offset_bottom = 24.0
 theme_override_colors/font_color = Color(0.31, 0.81, 0.7, 1)
 theme_override_font_sizes/font_size = 12
 text = "OBJETIVO ATUAL"
 
+[node name="StageLabel" type="Label" parent="Interface/ObjectivePanel"]
+unique_name_in_owner = true
+offset_left = 14.0
+offset_top = 7.0
+offset_right = 318.0
+offset_bottom = 25.0
+theme_override_colors/font_color = Color(0.4, 0.84, 0.76, 1)
+theme_override_font_sizes/font_size = 12
+text = "1/3  TREINAMENTO"
+
 [node name="ObjectiveLabel" type="Label" parent="Interface/ObjectivePanel"]
 unique_name_in_owner = true
 offset_left = 14.0
-offset_top = 29.0
-offset_right = 400.0
-offset_bottom = 66.0
+offset_top = 30.0
+offset_right = 318.0
+offset_bottom = 71.0
 theme_override_colors/font_color = Color(0.78, 0.86, 0.89, 1)
 theme_override_font_sizes/font_size = 13
 text = "Aprenda a se mover e use a habilidade do personagem."
@@ -128,10 +285,14 @@ autowrap_mode = 2
 
 [node name="BossPanel" type="ColorRect" parent="Interface"]
 unique_name_in_owner = true
-offset_left = 360.0
-offset_top = 102.0
-offset_right = 792.0
-offset_bottom = 170.0
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -216.0
+offset_top = -96.0
+offset_right = 216.0
+offset_bottom = -28.0
 color = Color(0.08, 0.035, 0.13, 0.94)
 
 [node name="BossNameLabel" type="Label" parent="Interface/BossPanel"]
@@ -156,112 +317,155 @@ show_percentage = false
 
 [node name="TutorialPanel" type="ColorRect" parent="Interface"]
 unique_name_in_owner = true
-offset_left = 296.0
-offset_top = 414.0
-offset_right = 856.0
-offset_bottom = 588.0
+anchor_left = 0.0
+anchor_top = 1.0
+anchor_right = 0.0
+anchor_bottom = 1.0
+offset_left = 22.0
+offset_top = -118.0
+offset_right = 352.0
+offset_bottom = -22.0
 color = Color(0.025, 0.082, 0.129, 0.95)
 
 [node name="TutorialAccent" type="ColorRect" parent="Interface/TutorialPanel"]
 offset_right = 8.0
-offset_bottom = 174.0
+offset_bottom = 96.0
 color = Color(0.22, 0.81, 0.69, 1)
 
 [node name="TutorialTitle" type="Label" parent="Interface/TutorialPanel"]
 unique_name_in_owner = true
 offset_left = 26.0
-offset_top = 14.0
-offset_right = 536.0
-offset_bottom = 41.0
+offset_top = 12.0
+offset_right = 308.0
+offset_bottom = 35.0
 theme_override_colors/font_color = Color(0.35, 0.9, 0.78, 1)
-theme_override_font_sizes/font_size = 19
-text = "TREINAMENTO DE SOBREVIVÊNCIA"
+theme_override_font_sizes/font_size = 16
+text = "MOVIMENTO"
 
 [node name="TutorialStep" type="Label" parent="Interface/TutorialPanel"]
 unique_name_in_owner = true
 offset_left = 26.0
-offset_top = 48.0
-offset_right = 536.0
-offset_bottom = 128.0
+offset_top = 42.0
+offset_right = 308.0
+offset_bottom = 72.0
 theme_override_colors/font_color = Color(0.8, 0.88, 0.91, 1)
-theme_override_font_sizes/font_size = 15
-text = "[0%] Mova-se com WASD ou setas\n[0%] Corra segurando Ctrl\n[PENDENTE] Use a habilidade"
+theme_override_font_sizes/font_size = 13
+text = "Use WASD ou as setas para explorar."
+autowrap_mode = 2
 
 [node name="TutorialProgress" type="ProgressBar" parent="Interface/TutorialPanel"]
 unique_name_in_owner = true
 offset_left = 26.0
-offset_top = 142.0
-offset_right = 536.0
-offset_bottom = 158.0
+offset_top = 79.0
+offset_right = 308.0
+offset_bottom = 86.0
 value = 0.0
 show_percentage = false
 
 [node name="Controls" type="Label" parent="Interface"]
+visible = false
+anchor_top = 1.0
+anchor_bottom = 1.0
 offset_left = 22.0
-offset_top = 614.0
+offset_top = -34.0
 offset_right = 780.0
-offset_bottom = 642.0
+offset_bottom = -6.0
 theme_override_colors/font_color = Color(0.72, 0.81, 0.86, 1)
 theme_override_font_sizes/font_size = 14
-text = "WASD / Setas: mover    •    Segurar Ctrl: correr    •    Espaço / J / Clique: habilidade    •    Esc: trocar"
+text = "WASD / Setas: mover    •    Ctrl: correr    •    Espaço / J / Clique: habilidade    •    Esc: pausa    •    F11: tela cheia"
 
 [node name="ChangeCharacter" type="Button" parent="Interface"]
-offset_left = 946.0
+visible = false
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -206.0
 offset_top = 18.0
-offset_right = 1130.0
+offset_right = -22.0
 offset_bottom = 58.0
 text = "Trocar personagem"
 
-[node name="HealDebug" type="Button" parent="Interface"]
-offset_left = 786.0
-offset_top = 70.0
-offset_right = 946.0
-offset_bottom = 108.0
+[node name="DeveloperPanel" type="ColorRect" parent="Interface"]
+unique_name_in_owner = true
+visible = false
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -366.0
+offset_top = 204.0
+offset_right = -22.0
+offset_bottom = 294.0
+color = Color(0.08, 0.035, 0.13, 0.94)
+
+[node name="DeveloperCaption" type="Label" parent="Interface/DeveloperPanel"]
+offset_left = 12.0
+offset_top = 8.0
+offset_right = 332.0
+offset_bottom = 28.0
+theme_override_colors/font_color = Color(0.84, 0.56, 0.92, 1)
+text = "DESENVOLVEDOR  [F3]"
+horizontal_alignment = 1
+
+[node name="HealDebug" type="Button" parent="Interface/DeveloperPanel"]
+offset_left = 12.0
+offset_top = 38.0
+offset_right = 160.0
+offset_bottom = 76.0
 text = "[DEBUG] Curar"
 
-[node name="KillDebug" type="Button" parent="Interface"]
-offset_left = 958.0
-offset_top = 70.0
-offset_right = 1130.0
-offset_bottom = 108.0
+[node name="KillDebug" type="Button" parent="Interface/DeveloperPanel"]
+offset_left = 172.0
+offset_top = 38.0
+offset_right = 332.0
+offset_bottom = 76.0
 text = "[DEBUG] Morrer"
 
 [node name="ResultPanel" type="ColorRect" parent="Interface"]
 unique_name_in_owner = true
-offset_left = 368.0
-offset_top = 220.0
-offset_right = 784.0
-offset_bottom = 430.0
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -190.0
+offset_top = -92.0
+offset_right = 190.0
+offset_bottom = 92.0
 color = Color(0.025, 0.082, 0.129, 0.96)
 
 [node name="ResultTitle" type="Label" parent="Interface/ResultPanel"]
 unique_name_in_owner = true
 offset_left = 24.0
-offset_top = 24.0
-offset_right = 392.0
-offset_bottom = 65.0
-theme_override_font_sizes/font_size = 27
+offset_top = 20.0
+offset_right = 356.0
+offset_bottom = 54.0
+theme_override_font_sizes/font_size = 23
 text = "SALA CONCLUÍDA"
 horizontal_alignment = 1
 
 [node name="ResultDetail" type="Label" parent="Interface/ResultPanel"]
 unique_name_in_owner = true
 offset_left = 24.0
-offset_top = 78.0
-offset_right = 392.0
-offset_bottom = 108.0
+offset_top = 62.0
+offset_right = 356.0
+offset_bottom = 106.0
 theme_override_colors/font_color = Color(0.72, 0.81, 0.86, 1)
 text = "Todos os inimigos foram derrotados."
 horizontal_alignment = 1
+autowrap_mode = 2
 
 [node name="Restart" type="Button" parent="Interface/ResultPanel"]
-offset_left = 78.0
-offset_top = 133.0
-offset_right = 338.0
-offset_bottom = 181.0
-text = "Reiniciar sala"
+offset_left = 60.0
+offset_top = 122.0
+offset_right = 320.0
+offset_bottom = 164.0
+text = "Tentar novamente"
 
 [connection signal="pressed" from="Interface/ChangeCharacter" to="." method="_on_change_character_pressed"]
-[connection signal="pressed" from="Interface/HealDebug" to="." method="_on_heal_debug_pressed"]
-[connection signal="pressed" from="Interface/KillDebug" to="." method="_on_kill_debug_pressed"]
+[connection signal="pressed" from="Interface/PausePanel/PauseCard/Resume" to="." method="_on_pause_resume_pressed"]
+[connection signal="pressed" from="Interface/PausePanel/PauseCard/Restart" to="." method="_on_restart_pressed"]
+[connection signal="pressed" from="Interface/PausePanel/PauseCard/Settings" to="." method="_on_pause_settings_pressed"]
+[connection signal="pressed" from="Interface/PausePanel/PauseCard/ChangeCharacter" to="." method="_on_change_character_pressed"]
+[connection signal="pressed" from="Interface/PausePanel/SettingsCard/Fullscreen" to="." method="_on_fullscreen_pressed"]
+[connection signal="toggled" from="Interface/PausePanel/SettingsCard/FogToggle" to="." method="_on_fog_toggled"]
+[connection signal="pressed" from="Interface/PausePanel/SettingsCard/CloseSettings" to="." method="_on_pause_settings_close_pressed"]
+[connection signal="pressed" from="Interface/DeveloperPanel/HealDebug" to="." method="_on_heal_debug_pressed"]
+[connection signal="pressed" from="Interface/DeveloperPanel/KillDebug" to="." method="_on_kill_debug_pressed"]
 [connection signal="pressed" from="Interface/ResultPanel/Restart" to="." method="_on_restart_pressed"]

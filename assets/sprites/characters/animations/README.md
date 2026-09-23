@@ -1,0 +1,11 @@
+# Animações dos personagens
+
+As folhas `*_sheet_source.png` foram geradas com a ferramenta de imagens integrada. Cada uma contém 24 poses em uma grade de 6 colunas por 4 linhas: idle, caminhada, ataque e dano/recuperação. O fundo possui transparência real. `tools/sprite_sheet_pipeline.gd` cria as versões de 64 e 32 px por quadro, mantém o registro da grade e retira um pequeno vazamento entre quadros da Vigia.
+
+O jogo usa `*_sheet_96.png` em escala 1:1 para preservar os detalhes e evitar pixels de tamanho desigual na tela. As versões `*_sheet_64.png` e `*_sheet_32.png` ficam disponíveis para usos menores. Para reconstruir os atlas, execute no Godot: `--headless --path . --script res://tools/sprite_sheet_pipeline.gd` e reimporte os PNGs no editor.
+
+Prompts finais usados na geração integrada (um por personagem):
+
+- **Quebra-Mar:** sprite sheet de pixel art para jogo de ação, marinheiro ruivo, bigodudo, gordo e forte, uniforme naval azul, âncora de metal pesada como arma. Seis poses de repouso, seis de caminhada, seis de ataque com antecipação, golpe e recuperação, seis de dano e recuperação. Silhueta e paleta consistentes, vista lateral em três quartos, dinâmica inspirada na quantidade de poses dos beat 'em ups clássicos, sem copiar personagens existentes. Grade regular 6×4, quadros isolados, fundo transparente, sem texto.
+- **Vigia:** sprite sheet de pixel art para jogo de ação, mulher de cabelo preto curto, boina verde e sobretudo marrom, arma de arpão. Seis poses de repouso, seis de caminhada, seis de mirar/disparar/recuperar, seis de dano e recuperação. Silhueta e paleta consistentes, vista lateral em três quartos, dinâmica de beat 'em up clássico sem copiar personagens existentes. Grade regular 6×4, quadros isolados, fundo transparente, sem texto.
+- **Mergulhador:** sprite sheet de pixel art para jogo de ação, rapaz jovem e negro com macacão de mergulho azul e detalhes ciano. Seis poses de repouso, seis de caminhada, seis de mergulho/salto/emersão e seis de dano e recuperação. Silhueta e paleta consistentes, vista lateral em três quartos, dinâmica de beat 'em up clássico sem copiar personagens existentes. Grade regular 6×4, quadros isolados, fundo transparente, sem texto.

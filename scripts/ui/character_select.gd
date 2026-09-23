@@ -5,7 +5,7 @@ extends Control
 
 var _selected_index := 0
 var _card_buttons: Array[Button] = []
-var _previews: Array[ColorRect] = []
+var _previews: Array[TextureRect] = []
 
 
 ## Monta os cartões, seleciona o primeiro perfil e prepara navegação por teclado.
@@ -51,9 +51,14 @@ func _build_cards() -> void:
 		var preview_space := CenterContainer.new()
 		preview_space.custom_minimum_size = Vector2(0, 125)
 		column.add_child(preview_space)
-		var preview := ColorRect.new()
-		preview.color = profile.color
-		preview.custom_minimum_size = Vector2(70, 96)
+		var preview := TextureRect.new()
+		var portrait_path := String(profile.get("portrait", ""))
+		if ResourceLoader.exists(portrait_path):
+			preview.texture = load(portrait_path) as Texture2D
+		preview.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		preview.custom_minimum_size = Vector2(108, 125)
 		preview.pivot_offset = preview.custom_minimum_size * 0.5
 		preview.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		preview_space.add_child(preview)
@@ -116,7 +121,7 @@ func _confirm_selection(index: int) -> void:
 
 
 ## Deforma o retângulo selecionado antes da troca de cena.
-func _play_confirm_animation(preview: ColorRect) -> void:
+func _play_confirm_animation(preview: TextureRect) -> void:
 	var tween := create_tween()
 	tween.tween_property(preview, "scale", Vector2(1.45, 0.75), 0.08)
 	tween.tween_property(preview, "scale", Vector2(0.9, 1.25), 0.08)

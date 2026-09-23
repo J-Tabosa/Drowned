@@ -42,12 +42,78 @@ var _typing := false
 var _active := false
 var _transitioning := false
 var _indicator_tween: Tween
+var _portrait_cache: Dictionary = {}
+var _mouths: Dictionary = {}
+var _speaker_slot := ""
+var _mouth_time := 0.0
+
+const MOUTH_SOURCE_POINTS := {
+	"breaker": Vector2(640, 480),
+	"sharpshooter": Vector2(642, 359),
+	"diver": Vector2(709, 394),
+}
 
 
 ## Mantém o overlay escondido e sem processamento até uma sequência ser iniciada.
 func _ready() -> void:
 	curtain.visible = false
+	for slot_name in ["left", "center", "right"]:
+		var portrait: Control = _get_slot_nodes(slot_name).portrait
+		var mouth := Polygon2D.new()
+		mouth.name = "SpeakingMouth"
+		mouth.polygon = PackedVector2Array([
+			Vector2(-11, -3), Vector2(11, -3), Vector2(9, 6),
+			Vector2(4, 10), Vector2(-5, 10), Vector2(-10, 6),
+		])
+		mouth.color = Color(0.20, 0.065, 0.065, 0.96)
+		mouth.visible = false
+		mouth.z_index = 2
+		portrait.add_child(mouth)
+		_mouths[slot_name] = mouth
+	_layout_stage()
+	get_viewport().size_changed.connect(_layout_stage)
 	set_process(false)
+
+
+func _layout_stage() -> void:
+	var screen := get_viewport().get_visible_rect().size
+	var slot_height := screen.y * 0.66
+	var slot_width := minf(450.0, screen.y * 0.72)
+	var slot_top := screen.y * 0.035
+	var side_inset := -minf(36.0, screen.x * 0.03)
+	var positions := {
+		"left": Vector2(side_inset, slot_top),
+		"center": Vector2((screen.x - slot_width) * 0.5, slot_top),
+		"right": Vector2(screen.x - slot_width + side_inset, slot_top),
+	}
+	for slot_name in ["left", "center", "right"]:
+		var portrait: Control = _get_slot_nodes(slot_name).portrait
+		portrait.position = positions[slot_name]
+		portrait.size = Vector2(slot_width, slot_height)
+		portrait.pivot_offset = portrait.size * 0.5
+		if _actors.has(_slots.get(slot_name, "")):
+			_place_mouth(slot_name, _actors[_slots[slot_name]])
+	var box_width := minf(1000.0, screen.x * 0.90)
+	var box_top := minf(screen.y * 0.58, screen.y - 170.0)
+	var box_bottom := screen.y - 10.0
+	if screen.y < 480.0:
+		speaker_label.add_theme_font_size_override("font_size", 17)
+		dialogue_label.add_theme_font_size_override("font_size", 15)
+		dialogue_label.custom_minimum_size.y = 58.0
+		continue_indicator.add_theme_font_size_override("font_size", 15)
+	else:
+		speaker_label.add_theme_font_size_override("font_size", 21)
+		dialogue_label.add_theme_font_size_override("font_size", 18)
+		dialogue_label.custom_minimum_size.y = 67.0
+		continue_indicator.add_theme_font_size_override("font_size", 18)
+	dialogue_box.position = Vector2((screen.x - box_width) * 0.5, box_top)
+	dialogue_box.size = Vector2(box_width, box_bottom - box_top)
+	dialogue_accent.position = dialogue_box.position + Vector2(-12.0, -10.0)
+	dialogue_accent.polygon = PackedVector2Array([
+		Vector2(0, 20), Vector2(46, 0), Vector2(box_width + 24.0, 0),
+		Vector2(box_width - 4.0, box_bottom - box_top + 20.0),
+		Vector2(20, box_bottom - box_top + 20.0),
+	])
 
 
 ## Recebe atores, ocupação inicial e falas; depois toca a entrada cinematográfica.
@@ -59,6 +125,7 @@ func start(sequence: Dictionary) -> void:
 	if _lines.is_empty():
 		finished.emit()
 		return
+	_layout_stage()
 	_slot_home_positions = {
 		"left": left_portrait.position,
 		"center": center_portrait.position,
@@ -80,6 +147,8 @@ func start(sequence: Dictionary) -> void:
 func _process(delta: float) -> void:
 	if not _active or not _typing:
 		return
+	_mouth_time += delta
+	_set_speaker_mouth(fmod(_mouth_time, 0.23) < 0.115)
 	_revealed_characters += _characters_per_second * delta
 	var total := dialogue_label.get_total_character_count()
 	dialogue_label.visible_characters = mini(int(_revealed_characters), total)
@@ -170,6 +239,7 @@ func _apply_actor_to_slot(slot: String, actor_id: String) -> void:
 	nodes.portrait.modulate = Color.WHITE
 	nodes.portrait.scale = Vector2.ONE
 	_slots[slot] = actor_id
+	_place_mouth(slot, actor)
 
 
 ## Aceita uma Texture2D pronta ou um caminho de recurso e usa nulo para o placeholder.
@@ -177,8 +247,69 @@ func _resolve_portrait(portrait_value: Variant) -> Texture2D:
 	if portrait_value is Texture2D:
 		return portrait_value
 	if portrait_value is String and not portrait_value.is_empty() and ResourceLoader.exists(portrait_value):
-		return load(portrait_value) as Texture2D
+		if _portrait_cache.has(portrait_value):
+			return _portrait_cache[portrait_value]
+		var original := load(portrait_value) as Texture2D
+		var image := original.get_image()
+		var bounds := _portrait_visible_region(image)
+		if bounds.has_area():
+			var atlas := AtlasTexture.new()
+			atlas.atlas = original
+			atlas.region = Rect2(bounds)
+			_portrait_cache[portrait_value] = atlas
+			return atlas
+		_portrait_cache[portrait_value] = original
+		return original
 	return null
+
+
+func _portrait_visible_region(image: Image) -> Rect2i:
+	# Generated PNGs contain faint alpha specks outside the silhouette. A small
+	# sampling stride finds the visible figure without treating those as artwork.
+	var min_x := image.get_width()
+	var min_y := image.get_height()
+	var max_x := -1
+	var max_y := -1
+	for y in range(0, image.get_height(), 3):
+		for x in range(0, image.get_width(), 3):
+			if image.get_pixel(x, y).a < 0.45:
+				continue
+			min_x = mini(min_x, x)
+			min_y = mini(min_y, y)
+			max_x = maxi(max_x, x)
+			max_y = maxi(max_y, y)
+	if max_x < min_x:
+		return image.get_used_rect()
+	return Rect2i(min_x, min_y, max_x - min_x + 3, max_y - min_y + 3).grow(16).intersection(Rect2i(Vector2i.ZERO, image.get_size()))
+
+
+func _place_mouth(slot: String, actor: Dictionary) -> void:
+	var mouth: Polygon2D = _mouths[slot]
+	mouth.visible = false
+	var source_point: Vector2 = MOUTH_SOURCE_POINTS.get(actor.get("id", ""), Vector2.ZERO)
+	var texture_rect: TextureRect = _get_slot_nodes(slot).texture
+	var atlas := texture_rect.texture as AtlasTexture
+	if source_point == Vector2.ZERO or atlas == null:
+		return
+	var region := atlas.region
+	var portrait: Control = _get_slot_nodes(slot).portrait
+	var factor := minf(portrait.size.x / region.size.x, portrait.size.y / region.size.y)
+	var drawn_size := region.size * factor
+	var local := source_point - region.position
+	if texture_rect.flip_h:
+		local.x = region.size.x - local.x
+	mouth.position = (portrait.size - drawn_size) * 0.5 + local * factor
+	mouth.scale = Vector2.ONE * factor
+	if actor.get("id", "") == "diver":
+		mouth.color = Color(0.16, 0.055, 0.035, 0.96)
+	else:
+		mouth.color = Color(0.20, 0.065, 0.065, 0.96)
+
+
+func _set_speaker_mouth(open: bool) -> void:
+	for slot_name in _mouths:
+		var mouth: Polygon2D = _mouths[slot_name]
+		mouth.visible = open and slot_name == _speaker_slot and _get_slot_nodes(slot_name).texture.visible
 
 
 ## Executa em ordem os comandos de entrada, saída ou substituição anteriores a uma fala.
@@ -257,6 +388,7 @@ func _show_current_line() -> void:
 	dialogue_label.text = line.get("text", "")
 	dialogue_label.visible_characters = 0
 	_revealed_characters = 0.0
+	_mouth_time = 0.0
 	_typing = true
 	_transitioning = false
 	continue_indicator.visible = false
@@ -269,6 +401,8 @@ func _focus_actor(actor_id: String) -> void:
 	for slot_name in _slots:
 		if _slots[slot_name] == actor_id:
 			active_slot = slot_name
+	_speaker_slot = active_slot
+	_set_speaker_mouth(false)
 	for slot_name in ["left", "center", "right"]:
 		var portrait: Control = _get_slot_nodes(slot_name).portrait
 		if not portrait.visible:
@@ -278,11 +412,13 @@ func _focus_actor(actor_id: String) -> void:
 		tween.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		tween.tween_property(portrait, "scale", Vector2.ONE if is_active else Vector2(0.94, 0.94), 0.18)
 		tween.tween_property(portrait, "modulate", Color.WHITE if is_active else Color(0.42, 0.48, 0.52, 0.82), 0.18)
+		portrait.z_index = 2 if is_active else 0
 
 
 ## Mostra imediatamente todo o texto e libera o indicador de continuação.
 func _finish_typing() -> void:
 	_typing = false
+	_set_speaker_mouth(false)
 	dialogue_label.visible_characters = -1
 	continue_indicator.visible = true
 	_indicator_tween = create_tween().set_loops()
@@ -308,6 +444,7 @@ func _close() -> void:
 		return
 	_transitioning = true
 	_active = false
+	_set_speaker_mouth(false)
 	continue_indicator.visible = false
 	if is_instance_valid(_indicator_tween):
 		_indicator_tween.kill()

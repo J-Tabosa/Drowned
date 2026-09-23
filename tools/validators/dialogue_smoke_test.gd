@@ -25,6 +25,7 @@ func _run() -> void:
 		assert(candidate.initial_slots.size() == 3)
 		assert(candidate.initial_slots.center == "player")
 		assert(candidate.actors.player.id == profile.id)
+		assert(ResourceLoader.exists(candidate.actors.player.portrait))
 		assert(candidate.lines.size() == 5)
 		assert(not candidate.actors.has("monster"))
 		assert(not candidate.actors.has("abyssal_creature"))
@@ -32,6 +33,11 @@ func _run() -> void:
 		assert(boss_reveal.actors.size() == 3)
 		assert(boss_reveal.lines.size() == 5)
 		assert(boss_reveal.lines[0].text == "O que raios é aquilo?")
+		for echo_index in 3:
+			var exploration_echo: Dictionary = catalog.get_exploration_echo(profile.id, echo_index)
+			assert(exploration_echo.actors.size() == 2)
+			assert(exploration_echo.lines.size() == 2)
+			assert(exploration_echo.actors.player.id == profile.id)
 
 	var stage := Node2D.new()
 	root.add_child(stage)
@@ -48,6 +54,12 @@ func _run() -> void:
 	assert(overlay.left_portrait.visible)
 	assert(overlay.center_portrait.visible)
 	assert(overlay.right_portrait.visible)
+	assert(overlay.left_texture.visible)
+	assert(overlay.center_texture.visible)
+	assert(overlay.right_texture.visible)
+	assert(not overlay.left_placeholder.visible)
+	assert(not overlay.center_placeholder.visible)
+	assert(not overlay.right_placeholder.visible)
 
 	for next_line_index in range(1, sequence.lines.size()):
 		overlay._finish_typing()
