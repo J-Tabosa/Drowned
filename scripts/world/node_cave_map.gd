@@ -1,50 +1,16 @@
 extends Node2D
-
-## O layout principal fica na cena e pode ser editado pelo Inspector.
+## O layout autoral fica na cena e pode ser editado pelo Inspector.
 ## Cada caractere do layout vira um tile-nó.
-## Legenda: s spawn, t tutorial, c combate, b mini-chefe, e saída.
+## Legenda: s origem, p trilha, c combate, b arena, e saída, ~ lagoa, r rocha, a alga, I relíquia.
 ## P jogador, T marco tutorial, L eco narrativo, C gatilho combate, M inimigos, B chefe, D foco da câmera.
 ## 1 portão do tutorial, 2 portão do chefe, 3 portão pós-chefe.
-const MAP_BLUEPRINT := [
-	"",
-	"                                          c",
-	"                                   ccccccccccccccc",
-	"                                ccccccccccccccccccccc",
-	"                              ccccccccccccccccccccccccc",
-	"                            cccccccccMccccccccccccccccccc",
-	"                           ccccccccccccccccccccccccccccccc",
-	"                        ttcccccMccccccccccccMcccccccccccccc",
-	"                     ttt111ccccccccccccccccccccccccMccccccc",
-	"                    ttttttcCccccccccccccccccccccccccccccccc",
-	"                  tttttttccccccccccccccccccccccccccccccccccc",
-	"                 ttttt    ccccccccccccccccccccccccccccccccc",
-	"                tTtL      ccccccccccccccccccccccccccccccccc",
-	"               tttt       cccccccMcccccccccccccccMccccccccc",
-	"              tttt         ccccccccccccccMcccccccccccccccc",
-	"       s     tttt           ccccccccccccccccccccccccccccc",
-	"    sssssss tttt              ccccccccccbcccccccccccccc",
-	"   sssssssssttt                 cccccccbDbccccccccccc",
-	"  sssssssLttt                     ccccbbbcccccccc",
-	"  sssssssssst                          bbbc",
-	" ssssssPssssss                         222",
-	"  sssssssssss                          bbb",
-	"  sLsssssssss                        bbbbbbb",
-	"   sssssssss                       bbbbbbbbbbb",
-	"    sssssss                        bbbbbbbbbbb",
-	"       s                          bbbbbbBbbbbbb",
-	"                                   bbbbbbbbbbb",
-	"                                   bbbbbbbbbbb",
-	"                                     bbbebbb",
-	"                                       eee",
-	"                                       333",
-	"                                       eee",
-	"                                       eEe",
-	"                                        e",
-]
 
 const TILE_SIZE := Vector2(180, 128)
 const TILE_STEP := Vector2(96, 64)
 const MAP_ORIGIN := Vector2(256, 192)
+const ITEM_SCENE := preload("res://scenes/world/items/cave_collectible.tscn")
+const PIXEL_ASSET := preload("res://scripts/world/pixel_asset_cache.gd")
+const EXIT_GATE_TEXTURE := preload("res://assets/sprites/world/orange_iron_gate_pixel.png")
 
 @export var floor_tile_scene: PackedScene = preload("res://scenes/world/tiles/cave_floor_tile.tscn")
 @export var wall_tile_scene: PackedScene = preload("res://scenes/world/tiles/cave_wall_tile.tscn")
@@ -58,12 +24,18 @@ const MAP_ORIGIN := Vector2(256, 192)
 @onready var gate_tiles: Node2D = %GateTiles
 @onready var props: Node2D = %Props
 @onready var markers: Node2D = %Markers
+@onready var items: Node2D = %Items
+@onready var lights: Node2D = %Lights
 
 var _floor_cells: Dictionary = {}
 var _anchors: Dictionary = {}
 var _mob_anchors: Array[Vector2] = []
 var _story_echo_anchors: Array[Vector2] = []
 var _story_echo_nodes: Array[Polygon2D] = []
+var _item_anchors: Array[Vector2] = []
+var _items_collected := 0
+var _exit_gate_art: Sprite2D
+var _light_texture: Texture2D
 var _gate_nodes: Dictionary = {
 	"tutorial": [],
 	"boss": [],
@@ -78,24 +50,30 @@ var _world_rect := Rect2()
 var _max_columns := 0
 var _map_rows: Array = []
 
+signal item_collected(collected: int, total: int)
+
 
 ## Constrói o mapa inteiro como nós editáveis a partir do blueprint e registra seus marcadores.
 func _ready() -> void:
 	add_to_group("walkable_area")
 	_map_rows = _get_map_rows()
 	_build_floor_and_anchors()
+	_story_echo_anchors.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.x < b.x)
+	_story_echo_nodes.sort_custom(func(a: Polygon2D, b: Polygon2D) -> bool: return a.position.x < b.position.x)
 	for echo_index in _story_echo_nodes.size():
 		_story_echo_nodes[echo_index].visible = echo_index == 0
 	_build_boundary_walls()
+	_build_exit_gate_art()
 	_world_rect = Rect2(Vector2.ZERO, Vector2(_max_columns * TILE_STEP.x + 512, _map_rows.size() * TILE_STEP.y + 384))
 	background.position = _world_rect.position
 	background.size = _world_rect.size
 
 
-## Usa o layout salvo na cena e mantém um fallback para cenas antigas do protótipo.
+## O layout salvo na cena é a única fonte da planta, sem geração procedural.
 func _get_map_rows() -> Array:
 	if map_layout.strip_edges().is_empty():
-		return MAP_BLUEPRINT
+		push_error("UnderwaterCave requer map_layout na cena.")
+		return []
 	var rows: Array = []
 	for row in map_layout.split("\n", true):
 		rows.append(row)
@@ -118,12 +96,22 @@ func _build_floor_and_anchors() -> void:
 			_spawn_tile(floor_tile_scene, floor_tiles, cell, "Floor", {
 				"tile_size": TILE_SIZE,
 				"region": region,
+				"cell": cell,
 			})
 			if _should_spawn_prop(cell, symbol):
 				_spawn_tile(prop_tile_scene, props, cell, "Prop", {
 					"tile_size": TILE_SIZE,
 					"region": region,
+					"cell": cell,
+					"prop_kind": _prop_kind_for_symbol(cell, symbol),
 				})
+			if symbol == "I":
+				_spawn_item(cell)
+				_spawn_light(cell, Color("d7ac68"), 0.85)
+			elif symbol == "a":
+				_spawn_light(cell, Color("52d7c2"), 0.58)
+			elif symbol == "~" and cell.x % 2 == 0:
+				_spawn_light(cell, Color("4ab0df"), 0.36)
 			if symbol == "M":
 				var mob_position := _cell_to_local(cell)
 				_mob_anchors.append(mob_position)
@@ -133,8 +121,8 @@ func _build_floor_and_anchors() -> void:
 				_register_anchor("player_spawn", _cell_to_local(cell))
 			elif symbol == "L":
 				var echo_position := _cell_to_local(cell)
-				_story_echo_anchors.push_front(echo_position)
-				_story_echo_nodes.push_front(_spawn_story_echo(echo_position))
+				_story_echo_anchors.append(echo_position)
+				_story_echo_nodes.append(_spawn_story_echo(echo_position))
 			elif symbol == "T":
 				_register_anchor("tutorial_focus", _cell_to_local(cell))
 			elif symbol == "C":
@@ -161,6 +149,7 @@ func _build_boundary_walls() -> void:
 		_spawn_tile(wall_tile_scene, wall_tiles, cell_value, "Wall", {
 			"tile_size": TILE_SIZE,
 			"region": "wall",
+			"cell": cell_value,
 		})
 
 
@@ -190,8 +179,65 @@ func _spawn_gate(cell: Vector2i, symbol: String) -> void:
 		"region": _region_for_symbol(symbol),
 		"gate_id": gate_id,
 		"theme_color": gate_color,
+		"cell": cell,
 	})
 	_gate_nodes[gate_id].append(gate_node)
+
+
+func _build_exit_gate_art() -> void:
+	var gate_cells: Array = _gate_nodes.post_boss
+	if gate_cells.is_empty():
+		return
+	var center := Vector2.ZERO
+	for gate_tile in gate_cells:
+		center += gate_tile.position
+	center /= float(gate_cells.size())
+	_exit_gate_art = Sprite2D.new()
+	_exit_gate_art.name = "OrangeIronGate"
+	_exit_gate_art.texture = PIXEL_ASSET.pixel_texture(EXIT_GATE_TEXTURE, Vector2i(96, 64))
+	_exit_gate_art.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_exit_gate_art.position = center + Vector2(0, -77)
+	_exit_gate_art.scale = Vector2(6.4, 4.8)
+	_exit_gate_art.z_index = 5
+	gate_tiles.add_child(_exit_gate_art)
+	_spawn_light(Vector2i(105, 34), Color("ec853e"), 0.75)
+
+
+func _spawn_item(cell: Vector2i) -> void:
+	var item := ITEM_SCENE.instantiate() as Area2D
+	item.name = "CompassRelic_%02d_%02d" % [cell.y, cell.x]
+	item.position = _cell_to_local(cell)
+	items.add_child(item)
+	_item_anchors.append(item.position)
+	item.picked_up.connect(_on_item_picked)
+
+
+func _on_item_picked() -> void:
+	_items_collected += 1
+	item_collected.emit(_items_collected, _item_anchors.size())
+
+
+func _spawn_light(cell: Vector2i, tint: Color, strength: float) -> void:
+	if _light_texture == null:
+		_light_texture = _make_light_texture()
+	var light := PointLight2D.new()
+	light.name = "Bioluminescence_%02d_%02d" % [cell.y, cell.x]
+	light.position = _cell_to_local(cell) + Vector2(0, -18)
+	light.texture = _light_texture
+	light.texture_scale = 3.2
+	light.color = tint
+	light.energy = strength
+	lights.add_child(light)
+
+
+func _make_light_texture() -> ImageTexture:
+	var image := Image.create(128, 128, false, Image.FORMAT_RGBA8)
+	for y in 128:
+		for x in 128:
+			var distance := Vector2(float(x) - 63.5, float(y) - 63.5).length() / 63.5
+			var alpha := pow(maxf(0.0, 1.0 - distance), 2.3)
+			image.set_pixel(x, y, Color(1, 1, 1, alpha))
+	return ImageTexture.create_from_image(image)
 
 
 ## Registra um Marker2D visível na árvore e guarda sua posição para o diretor da fase.
@@ -271,6 +317,8 @@ func get_farthest_walkable_position(from_world: Vector2, to_world: Vector2, marg
 ## Localiza o losango sob um ponto e rejeita especificamente tiles de portões fechados.
 func _is_point_on_open_floor(local_point: Vector2) -> bool:
 	var guessed_row := roundi((local_point.y - MAP_ORIGIN.y) / TILE_STEP.y)
+	var nearest_symbol := ""
+	var nearest_distance := INF
 	for row_index in range(guessed_row - 1, guessed_row + 2):
 		var shift := TILE_STEP.x * 0.5 if row_index % 2 != 0 else 0.0
 		var guessed_column := roundi((local_point.x - MAP_ORIGIN.x - shift) / TILE_STEP.x)
@@ -281,11 +329,13 @@ func _is_point_on_open_floor(local_point: Vector2) -> bool:
 			var center := _cell_to_local(cell)
 			var diamond_distance := absf(local_point.x - center.x) / (TILE_SIZE.x * 0.5)
 			diamond_distance += absf(local_point.y - center.y) / (TILE_SIZE.y * 0.5)
-			if diamond_distance <= 1.03:
-				var symbol: String = _floor_cells[cell]
-				var gate_id := _gate_id_for_symbol(symbol)
-				return gate_id.is_empty() or bool(_gate_open[gate_id])
-	return false
+			if diamond_distance <= 1.03 and diamond_distance < nearest_distance:
+				nearest_distance = diamond_distance
+				nearest_symbol = _floor_cells[cell]
+	if nearest_symbol.is_empty() or nearest_symbol in ["~", "r"]:
+		return false
+	var gate_id := _gate_id_for_symbol(nearest_symbol)
+	return gate_id.is_empty() or bool(_gate_open[gate_id])
 
 
 ## Fornece limites calculados do blueprint para câmera e projéteis.
@@ -304,6 +354,17 @@ func get_mob_spawn_positions() -> Array[Vector2]:
 	for local_position in _mob_anchors:
 		positions.append(to_global(local_position))
 	return positions
+
+
+func get_item_positions() -> Array[Vector2]:
+	var positions: Array[Vector2] = []
+	for local_position in _item_anchors:
+		positions.append(to_global(local_position))
+	return positions
+
+
+func get_collected_item_count() -> int:
+	return _items_collected
 
 
 ## Retorna os ecos do prólogo na ordem natural de exploração, do naufrágio à câmara.
@@ -341,8 +402,9 @@ func get_tile_counts() -> Dictionary:
 	return {
 		"floor": floor_tiles.get_child_count(),
 		"wall": wall_tiles.get_child_count(),
-		"gate": gate_tiles.get_child_count(),
+		"gate": _gate_nodes.tutorial.size() + _gate_nodes.boss.size() + _gate_nodes.post_boss.size(),
 		"props": props.get_child_count(),
+		"items": items.get_child_count(),
 	}
 
 
@@ -382,13 +444,23 @@ func _set_gate_open(gate_id: String, is_open: bool) -> void:
 	for gate_node in _gate_nodes.get(gate_id, []):
 		if is_instance_valid(gate_node) and gate_node.has_method("set_open"):
 			gate_node.set_open(is_open)
+	if gate_id == "post_boss" and is_instance_valid(_exit_gate_art):
+		var gate_tween := create_tween().set_parallel(true)
+		gate_tween.tween_property(_exit_gate_art, "modulate:a", 0.0 if is_open else 1.0, 0.4)
+		gate_tween.tween_property(_exit_gate_art, "scale:y", 0.04 if is_open else 4.8, 0.4)
 
 
 ## Define a paleta de cada caractere semântico do blueprint.
 func _region_for_symbol(symbol: String) -> String:
+	if symbol == "p":
+		return "path"
+	if symbol == "~":
+		return "pool"
+	if symbol == "r":
+		return "rock"
 	if symbol in ["s", "P", "L"]:
 		return "spawn"
-	if symbol in ["t", "T", "1"]:
+	if symbol in ["T", "1"]:
 		return "tutorial"
 	if symbol in ["c", "C", "M"]:
 		return "combat"
@@ -414,6 +486,20 @@ func _gate_id_for_symbol(symbol: String) -> String:
 
 ## Espalha props de forma determinística sem exigir posições manuais.
 func _should_spawn_prop(cell: Vector2i, symbol: String) -> bool:
-	if symbol in ["P", "T", "L", "C", "M", "D", "B", "E", "1", "2", "3"]:
+	if symbol in ["a", "r"]:
+		return true
+	if symbol in ["P", "T", "L", "C", "M", "D", "B", "E", "I", "~", "1", "2", "3"]:
 		return false
-	return absi(cell.x * 31 + cell.y * 17) % 19 == 0
+	return absi(cell.x * 31 + cell.y * 17) % 23 == 0
+
+
+func _prop_kind_for_symbol(cell: Vector2i, symbol: String) -> String:
+	if symbol == "a":
+		return "algae"
+	if symbol == "r":
+		return "rock"
+	match absi(cell.x * 13 + cell.y * 29) % 4:
+		0: return "algae"
+		1: return "rock"
+		2: return "coral"
+		_: return "stalagmite"

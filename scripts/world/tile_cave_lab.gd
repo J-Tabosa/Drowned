@@ -51,6 +51,7 @@ const COMBAT_WAVE_SIZES := [4, 5, 6]
 @onready var settings_card: ColorRect = %SettingsCard
 @onready var developer_panel: ColorRect = %DeveloperPanel
 @onready var controls_label: Label = $Interface/Controls
+@onready var relic_label: Label = %RelicLabel
 
 var player: CharacterBody2D
 var _boss: CharacterBody2D
@@ -83,6 +84,8 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_layout_hud)
 	_layout_hud()
 	_spawn_player()
+	arena.item_collected.connect(_on_item_collected)
+	_on_item_collected(0, arena.get_item_positions().size())
 	result_panel.visible = false
 	boss_panel.visible = false
 	tutorial_panel.visible = true
@@ -92,6 +95,10 @@ func _ready() -> void:
 	_set_stage_text("1/3  EXPLORAÇÃO")
 	_set_objective("Pratique os controles para iniciar a exploração.")
 	_refresh_action_prompt()
+
+
+func _on_item_collected(collected: int, total: int) -> void:
+	relic_label.text = "RELÍQUIAS  %d/%d" % [collected, total]
 
 
 func _style_hud() -> void:

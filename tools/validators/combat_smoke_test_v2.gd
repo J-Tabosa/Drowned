@@ -24,15 +24,16 @@ func _run() -> void:
 		assert(lab._enemies_alive == 0)
 		var arena: Node = lab.get_node("Arena")
 		assert(not arena.map_layout.strip_edges().is_empty())
-		assert(arena._map_rows.size() == 34)
+		assert(arena._map_rows.size() == 43)
 		var tile_counts: Dictionary = arena.get_tile_counts()
-		assert(tile_counts.floor > 400)
+		assert(tile_counts.floor > 1000)
 		assert(tile_counts.wall > 80)
-		assert(tile_counts.gate == 9)
+		assert(tile_counts.gate == 26)
+		assert(tile_counts.items == 3)
 		assert(arena.is_walkable(arena.get_anchor_position("player_spawn")))
 		assert(arena.get_mob_spawn_positions().size() == 7)
 		assert(arena.get_story_echo_positions().size() == 3)
-		assert(arena.get_world_rect().size.x > 6000.0)
+		assert(arena.get_world_rect().size.x > 12000.0)
 		assert(not arena.is_tutorial_gate_open())
 		assert(not arena.is_boss_gate_open())
 		assert(not arena.is_post_boss_gate_open())
@@ -52,9 +53,8 @@ func _run() -> void:
 		Input.action_release("move_right")
 
 		if profile.id == "diver":
-			var tutorial_gate: Node2D = arena._gate_nodes.tutorial[1]
-			var before_gate := tutorial_gate.global_position - Vector2(192.0, 0.0)
-			var after_gate: Vector2 = arena.get_anchor_position("combat_trigger")
+			var before_gate: Vector2 = arena.to_global(arena._cell_to_local(Vector2i(39, 13)))
+			var after_gate: Vector2 = arena.to_global(arena._cell_to_local(Vector2i(41, 13)))
 			assert(arena.is_walkable(before_gate, 20.0))
 			assert(arena.is_walkable(after_gate, 20.0))
 			lab.player.global_position = before_gate
