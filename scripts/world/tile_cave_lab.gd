@@ -101,47 +101,74 @@ func _on_item_collected(collected: int, total: int) -> void:
 	relic_label.text = "RELÍQUIAS  %d/%d" % [collected, total]
 
 
+var _hud_columns: Dictionary = {}
+
 func _style_hud() -> void:
+	var accent: Color = GameState.get_selected_profile().color
+	for node in [$Interface/TopPanel, $Interface/ObjectivePanel, tutorial_panel, boss_panel,
+		result_panel, $Interface/PausePanel/PauseCard, settings_card]:
+		node.theme = NauticalUI.theme(accent)
+		NauticalUI.skin(node)
+	_hud_columns["status"] = NauticalUI.column($Interface/TopPanel, [character_label, health_label, health_bar, action_label, cooldown_bar])
+	_hud_columns["objective"] = NauticalUI.column($Interface/ObjectivePanel, [stage_label, objective_label], true)
+	_hud_columns["tutorial"] = NauticalUI.column(tutorial_panel, [tutorial_title, tutorial_step, tutorial_progress], true)
+	_hud_columns["boss"] = NauticalUI.column(boss_panel, [boss_name_label, boss_health_bar])
+	_hud_columns["result"] = NauticalUI.column(result_panel, [result_title, result_detail], true)
+	for path in ["TopPanel/TopAccent", "ObjectivePanel/ObjectiveAccent", "TutorialPanel/TutorialAccent"]:
+		$Interface.get_node(path).hide()
+	$Interface/PausePanel/SettingsCard/SettingsInfo.hide()
+	var speed := NauticalUI.speed_selector()
+	settings_card.add_child(speed)
+	speed.position = Vector2(24, 178)
+	speed.size = Vector2(300, 42)
 	_style_bar(health_bar, Color("de6572"))
-	_style_bar(cooldown_bar, Color("49caba"))
+	_style_bar(cooldown_bar, accent)
 	_style_bar(tutorial_progress, Color("52d7b0"))
 	_style_bar(boss_health_bar, Color("af76c8"))
-
+	NauticalUI.navigation_heading(character_label, accent)
+	NauticalUI.navigation_heading(stage_label, Color("52d7b0"))
+	NauticalUI.navigation_heading(tutorial_title, Color("52d7b0"))
+	character_label.add_theme_font_size_override("font_size", 19)
+	result_title.add_theme_font_size_override("font_size", 23)
 
 func _style_bar(bar: ProgressBar, fill_color: Color) -> void:
-	var background := StyleBoxFlat.new()
-	background.bg_color = Color("243b4a")
-	background.set_corner_radius_all(4)
+	var background := NauticalUI.flat(Color("142e3a"), NauticalUI.BRASS)
+	background.set_content_margin_all(0)
 	var fill := StyleBoxFlat.new()
 	fill.bg_color = fill_color
-	fill.set_corner_radius_all(4)
 	bar.add_theme_stylebox_override("background", background)
 	bar.add_theme_stylebox_override("fill", fill)
 
+func _place_panel(panel: Control, rect: Rect2) -> void:
+	panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	panel.position = rect.position
+	panel.size = rect.size
 
 func _layout_hud() -> void:
-	var width := get_viewport().get_visible_rect().size.x
-	var compact := width < 760.0
-	var top_panel: ColorRect = $Interface/TopPanel
-	var objective_panel: ColorRect = $Interface/ObjectivePanel
-	var panel_width := 294.0 if compact else 332.0
-	var margin := 12.0 if compact else 22.0
-	var scale_factor := minf(1.0, (width - 3.0 * margin) / (2.0 * panel_width)) if compact else 1.0
-	top_panel.size.x = panel_width
-	objective_panel.size.x = panel_width
-	top_panel.scale = Vector2.ONE * scale_factor
-	objective_panel.scale = Vector2.ONE * scale_factor
-	top_panel.position = Vector2(margin, 10.0 if compact else 18.0)
-	objective_panel.position = Vector2(width - margin - panel_width * scale_factor, 10.0 if compact else 18.0)
-	$Interface/TopPanel/TopAccent.size.x = panel_width
-	$Interface/ObjectivePanel/ObjectiveAccent.size.x = panel_width
-	character_label.offset_right = panel_width - 18.0
-	action_label.offset_right = panel_width - 18.0
-	health_bar.offset_left = 124.0 if compact else 136.0
-	health_bar.offset_right = panel_width - 18.0
-	cooldown_bar.offset_right = panel_width - 18.0
-	stage_label.offset_right = panel_width - 14.0
-	objective_label.offset_right = panel_width - 14.0
+	var screen := get_viewport().get_visible_rect().size
+	var margin := 12.0
+	var width := minf(340.0, screen.x - margin * 2.0)
+	# Permanent information stays on the left; contexts use the opposite bottom lane.
+	_place_panel($Interface/TopPanel, Rect2(margin, margin, width, 166))
+	var objective_y := 190.0
+	var objective_height := minf(180.0, maxf(90.0, screen.y - objective_y - 56.0))
+	_place_panel($Interface/ObjectivePanel, Rect2(margin, objective_y, width, objective_height))
+	var context_width := minf(380.0, screen.x - 2.0 * margin)
+	var context_height := minf(156.0, screen.y * 0.32)
+	_place_panel(tutorial_panel, Rect2(screen.x - context_width - margin, screen.y - context_height - margin, context_width, context_height))
+	_place_panel(boss_panel, Rect2(screen.x - context_width - margin, screen.y - 94 - margin, context_width, 94))
+	relic_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	relic_label.position = Vector2(margin, screen.y - 38)
+	relic_label.size = Vector2(width, 26)
+	var result_size := Vector2(minf(480, screen.x - 24), minf(260, screen.y - 24))
+	_place_panel(result_panel, Rect2((screen - result_size) * 0.5, result_size))
+	result_panel.get_node("Layout").offset_bottom = -64
+	var restart: Button = result_panel.get_node("Restart")
+	restart.position = Vector2(24, result_size.y - 58)
+	restart.size = Vector2(result_size.x - 48, 42)
+	# Scroll text when it exceeds its allotted lane; never reduce the font to fit.
+	for key in ["objective", "tutorial", "result"]:
+		_hud_columns[key].custom_minimum_size.x = 0
 
 
 ## Monitora requisitos e proximidade dos marcadores C e B desenhados no blueprint.
@@ -417,6 +444,8 @@ func _begin_boss_fight(skip_card := false) -> void:
 
 ## Atualiza o dispositivo de entrada, alterna fullscreen/debug e mantém atalhos globais ativos.
 func _input(event: InputEvent) -> void:
+	if DialogueManager.is_playing():
+		return
 	if event.is_action_pressed("ui_cancel"):
 		_toggle_pause()
 		get_viewport().set_input_as_handled()
