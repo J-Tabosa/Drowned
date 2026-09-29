@@ -20,6 +20,19 @@ func _run() -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUTPUT))
 	var state: Node = root.get_node("GameState")
 	var original_speed: int = state.dialogue_speed_index
+	for resolution in [Vector2i(640, 360), Vector2i(960, 540), Vector2i(1152, 648), Vector2i(1920, 1080)]:
+		root.size = resolution
+		var selection: Control = load("res://scenes/ui/menus/character_select.tscn").instantiate()
+		root.add_child(selection)
+		current_scene = selection
+		await _settle()
+		var bounds := Rect2(Vector2.ZERO, root.get_visible_rect().size)
+		for button: Button in selection._card_buttons:
+			assert(bounds.encloses(button.get_global_rect()))
+		assert(not selection.get_node("Center") is ScrollContainer)
+		await _capture("selection_" + str(resolution.x))
+		selection.queue_free()
+		await process_frame
 	var scene: Variant = load("res://scenes/world/areas/movement_lab.tscn").instantiate()
 	scene.skip_cinematics_for_tests = true
 	root.add_child(scene)
@@ -37,17 +50,30 @@ func _run() -> void:
 		assert(scroll.get_v_scroll_bar().max_value > scroll.size.y)
 		scroll.scroll_vertical = 100000
 		await _settle()
+		assert(absf(status.size.x * status.scale.x / (root.get_visible_rect().size.x / root.size.x) - minf(280, root.size.x * 0.42)) < 1.0)
 		await _capture("hud_" + str(resolution.x) + "x" + str(resolution.y))
 		scene._set_objective("Investigue os sinais deixados entre os destroços.")
-	root.size = Vector2i(960, 540)
-	var selection: Control = load("res://scenes/ui/menus/character_select.tscn").instantiate()
-	root.add_child(selection)
-	scene.get_node("Interface").hide()
-	await _settle()
-	await _capture("selection")
-	selection.queue_free()
-	scene.get_node("Interface").show()
-	await process_frame
+	scene._set_objective("Teste do aviso temporário.")
+	assert(scene.get_node("Interface/ObjectivePanel").visible)
+	scene._update_objective_visibility(5.1)
+	assert(not scene.get_node("Interface/ObjectivePanel").visible)
+	scene._objective_toggle.button_pressed = true
+	scene._update_objective_visibility(0)
+	assert(scene.get_node("Interface/ObjectivePanel").visible)
+	scene._objective_toggle.button_pressed = false
+	scene._update_objective_visibility(0)
+	assert(not scene.get_node("Interface/ObjectivePanel").visible)
+	var hover := InputEventMouseMotion.new()
+	hover.position = scene._objective_toggle.get_global_rect().get_center()
+	root.push_input(hover, true)
+	scene._update_objective_visibility(0)
+	assert(scene.get_node("Interface/ObjectivePanel").visible)
+	hover.position = Vector2.ZERO
+	root.push_input(hover, true)
+	scene._update_objective_visibility(0)
+	assert(not scene.get_node("Interface/ObjectivePanel").visible)
+	scene._set_objective("A missão reaparece quando muda.")
+	assert(scene.get_node("Interface/ObjectivePanel").visible)
 	# Color follows the selected character, while health keeps a stable semantic color.
 	for profile in state.CHARACTER_PROFILES:
 		state.select_character(profile.id)
@@ -71,6 +97,9 @@ func _run() -> void:
 		await create_timer(0.8).timeout
 		var overlay: Variant = manager._active_overlay
 		assert(is_instance_valid(overlay))
+		assert(overlay.dialogue_box.find_children("*", "OptionButton", true, false).is_empty())
+		assert(overlay.dialogue_box.find_children("*", "Button", true, false).is_empty())
+		assert(overlay.continue_indicator.modulate.a < 0.5)
 		assert(overlay._characters_per_second == state.get_dialogue_speed())
 		if index == 3:
 			assert(not overlay._typing)
