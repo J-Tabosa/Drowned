@@ -10,6 +10,7 @@ var _previews: Array[TextureRect] = []
 
 ## Monta os cartões, seleciona o primeiro perfil e prepara navegação por teclado.
 func _ready() -> void:
+	theme = NauticalUI.theme()
 	_build_cards()
 	_update_selection()
 	_card_buttons[0].grab_focus()
@@ -32,12 +33,8 @@ func _build_cards() -> void:
 	for index in GameState.CHARACTER_PROFILES.size():
 		var profile: Dictionary = GameState.CHARACTER_PROFILES[index]
 		var panel := PanelContainer.new()
-		panel.custom_minimum_size = Vector2(300, 355)
-		var style := StyleBoxFlat.new()
-		style.bg_color = Color("13293d")
-		style.border_color = Color(profile.color, 0.65)
-		style.set_border_width_all(2)
-		style.set_corner_radius_all(14)
+		panel.custom_minimum_size = Vector2(260, 355)
+		var style := NauticalUI.panel_style()
 		style.content_margin_left = 22
 		style.content_margin_right = 22
 		style.content_margin_top = 22
