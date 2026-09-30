@@ -48,7 +48,6 @@ var _speaker_slot := ""
 var _mouth_time := 0.0
 var _text_scroll: ScrollContainer
 var _skip_requested := false
-var _speed_selector: OptionButton
 
 const MOUTH_SOURCE_POINTS := {
 	"breaker": Vector2(640, 480),
@@ -72,18 +71,11 @@ func _ready() -> void:
 	dialogue_label.reparent(_text_scroll)
 	dialogue_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	dialogue_label.custom_minimum_size = Vector2.ZERO
-	var actions := HBoxContainer.new()
-	actions.add_theme_constant_override("separation", 8)
-	content.add_child(actions)
-	_speed_selector = NauticalUI.speed_selector()
-	_speed_selector.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	actions.add_child(_speed_selector)
-	var skip := Button.new()
-	skip.text = "Pular diálogo [Esc]"
-	skip.pressed.connect(_request_skip)
-	actions.add_child(skip)
-	continue_indicator.text = "Enter / Espaço: revelar ou avançar"
-	continue_indicator.add_theme_font_size_override("font_size", 14)
+	continue_indicator.text = "Enter / Espaço · avançar     Esc · pular"
+	continue_indicator.modulate.a = 0.45
+	continue_indicator.add_theme_font_size_override("font_size", 11)
+	dialogue_accent.hide()
+	bottom_bar.hide()
 	for slot_name in ["left", "center", "right"]:
 		var portrait: Control = _get_slot_nodes(slot_name).portrait
 		var mouth := Polygon2D.new()
@@ -105,9 +97,9 @@ func _ready() -> void:
 func _layout_stage() -> void:
 	var screen := get_viewport().get_visible_rect().size
 	var slot_height := screen.y * 0.66
-	var slot_width := minf(450.0, screen.y * 0.72)
+	var slot_width := minf(screen.x * 0.29, screen.y * 0.62)
 	var slot_top := screen.y * 0.035
-	var side_inset := -minf(36.0, screen.x * 0.03)
+	var side_inset := screen.x * 0.025
 	var positions := {
 		"left": Vector2(side_inset, slot_top),
 		"center": Vector2((screen.x - slot_width) * 0.5, slot_top),
@@ -120,29 +112,19 @@ func _layout_stage() -> void:
 		portrait.pivot_offset = portrait.size * 0.5
 		if _actors.has(_slots.get(slot_name, "")):
 			_place_mouth(slot_name, _actors[_slots[slot_name]])
-	var box_width := minf(1000.0, screen.x * 0.90)
-	var box_top := screen.y * 0.55
-	var box_bottom := screen.y - 10.0
-	if screen.y < 480.0:
-		speaker_label.add_theme_font_size_override("font_size", 17)
-		dialogue_label.add_theme_font_size_override("font_size", 15)
-		dialogue_label.custom_minimum_size.y = 0.0
-		continue_indicator.add_theme_font_size_override("font_size", 15)
-	else:
-		speaker_label.add_theme_font_size_override("font_size", 21)
-		dialogue_label.add_theme_font_size_override("font_size", 18)
-		dialogue_label.custom_minimum_size.y = 0.0
-		continue_indicator.add_theme_font_size_override("font_size", 18)
-	dialogue_box.position = Vector2((screen.x - box_width) * 0.5, box_top)
-	dialogue_box.size = Vector2(box_width, box_bottom - box_top)
+	var pixel_scale := screen.x / float(get_window().size.x)
+	var box_width := minf(820.0, float(get_window().size.x) * 0.88)
+	var box_height := 150.0
+	speaker_label.add_theme_font_size_override("font_size", 17)
+	dialogue_label.add_theme_font_size_override("font_size", 16)
+	continue_indicator.add_theme_font_size_override("font_size", 11)
+	dialogue_label.custom_minimum_size.y = 0.0
+	dialogue_box.scale = Vector2.ONE * pixel_scale
+	dialogue_box.position = Vector2((screen.x - box_width * pixel_scale) * 0.5, screen.y - (box_height + 18.0) * pixel_scale)
+	dialogue_box.size = Vector2(box_width, box_height)
 	for slot_name in ["left", "center", "right"]:
 		_slot_home_positions[slot_name] = positions[slot_name]
-	dialogue_accent.position = dialogue_box.position + Vector2(-12.0, -10.0)
-	dialogue_accent.polygon = PackedVector2Array([
-		Vector2(0, 20), Vector2(46, 0), Vector2(box_width + 24.0, 0),
-		Vector2(box_width - 4.0, box_bottom - box_top + 20.0),
-		Vector2(20, box_bottom - box_top + 20.0),
-	])
+
 
 
 ## Recebe atores, ocupação inicial e falas; depois toca a entrada cinematográfica.

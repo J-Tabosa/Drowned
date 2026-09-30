@@ -102,6 +102,12 @@ func _on_item_collected(collected: int, total: int) -> void:
 
 
 var _hud_columns: Dictionary = {}
+var _objective_toggle: Button
+var _objective_time_left := 0.0
+var _objective_pinned := false
+var _hud_pixel_scale := 1.0
+var _objective_mouse_position := Vector2(-100, -100)
+
 
 func _style_hud() -> void:
 	var accent: Color = GameState.get_selected_profile().color
@@ -128,7 +134,37 @@ func _style_hud() -> void:
 	NauticalUI.navigation_heading(character_label, accent)
 	NauticalUI.navigation_heading(stage_label, Color("52d7b0"))
 	NauticalUI.navigation_heading(tutorial_title, Color("52d7b0"))
-	character_label.add_theme_font_size_override("font_size", 19)
+	for panel in [$Interface/TopPanel, $Interface/ObjectivePanel, tutorial_panel, boss_panel]:
+		var margin: MarginContainer = panel.get_node("Layout")
+		for side in ["left", "top", "right", "bottom"]:
+			margin.add_theme_constant_override("margin_" + side, 10)
+	for key in ["status", "objective", "tutorial", "boss"]:
+		_hud_columns[key].add_theme_constant_override("separation", 4)
+	for label in [health_label, action_label, stage_label, objective_label, tutorial_step, tutorial_title, boss_name_label]:
+		label.add_theme_font_size_override("font_size", 13)
+	for label in [character_label, stage_label, tutorial_title]:
+		label.get_parent().get_child(0).custom_minimum_size = Vector2(16, 16)
+	health_bar.custom_minimum_size.y = 7
+	cooldown_bar.custom_minimum_size.y = 5
+	tutorial_progress.custom_minimum_size.y = 5
+	boss_health_bar.custom_minimum_size.y = 10
+	_objective_toggle = Button.new()
+	_objective_toggle.name = "ObjectiveToggle"
+	_objective_toggle.text = "Missão ▾"
+	_objective_toggle.toggle_mode = true
+	_objective_toggle.add_theme_font_size_override("font_size", 12)
+	_objective_toggle.theme = NauticalUI.theme(Color("52d7b0"))
+	for state in ["normal", "hover", "pressed", "focus"]:
+		var style: StyleBox = _objective_toggle.get_theme_stylebox(state).duplicate()
+		style.set_content_margin_all(4)
+		_objective_toggle.add_theme_stylebox_override(state, style)
+	_objective_toggle.toggled.connect(func(pinned: bool) -> void:
+		_objective_pinned = pinned
+		if not pinned:
+			_objective_time_left = 0.0
+	)
+	$Interface.add_child(_objective_toggle)
+	character_label.add_theme_font_size_override("font_size", 16)
 	result_title.add_theme_font_size_override("font_size", 23)
 
 func _style_bar(bar: ProgressBar, fill_color: Color) -> void:
@@ -145,34 +181,58 @@ func _place_panel(panel: Control, rect: Rect2) -> void:
 	panel.size = rect.size
 
 func _layout_hud() -> void:
-	var screen := get_viewport().get_visible_rect().size
+	var logical := get_viewport().get_visible_rect().size
+	_hud_pixel_scale = logical.x / float(get_window().size.x)
+	var screen := logical / _hud_pixel_scale
 	var margin := 12.0
-	var width := minf(340.0, screen.x - margin * 2.0)
-	# Permanent information stays on the left; contexts use the opposite bottom lane.
-	_place_panel($Interface/TopPanel, Rect2(margin, margin, width, 166))
-	var objective_y := 190.0
-	var objective_height := minf(180.0, maxf(90.0, screen.y - objective_y - 56.0))
-	_place_panel($Interface/ObjectivePanel, Rect2(margin, objective_y, width, objective_height))
-	var context_width := minf(380.0, screen.x - 2.0 * margin)
-	var context_height := minf(156.0, screen.y * 0.32)
-	_place_panel(tutorial_panel, Rect2(screen.x - context_width - margin, screen.y - context_height - margin, context_width, context_height))
-	_place_panel(boss_panel, Rect2(screen.x - context_width - margin, screen.y - 94 - margin, context_width, 94))
+	var width := minf(280.0, screen.x * 0.42)
+	var objective_width := minf(360.0, screen.x - width - margin * 3)
+	var objective_x := maxf(width + margin * 2, (screen.x - objective_width) * 0.5)
+	_place_compact_panel($Interface/TopPanel, Rect2(margin, margin, width, 126))
+	_place_compact_panel($Interface/ObjectivePanel, Rect2(objective_x, 44, objective_width, 94))
+	_place_compact_panel(_objective_toggle, Rect2(objective_x + objective_width - 100, margin, 100, 26))
+	var context_width := minf(300.0, screen.x * 0.44)
+	_place_compact_panel(tutorial_panel, Rect2(screen.x - context_width - margin, screen.y - 94 - margin, context_width, 94))
+	_place_compact_panel(boss_panel, Rect2(screen.x - context_width - margin, screen.y - 76 - margin, context_width, 76))
 	relic_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
-	relic_label.position = Vector2(margin, screen.y - 38)
-	relic_label.size = Vector2(width, 26)
-	var result_size := Vector2(minf(480, screen.x - 24), minf(260, screen.y - 24))
-	_place_panel(result_panel, Rect2((screen - result_size) * 0.5, result_size))
+	relic_label.scale = Vector2.ONE * _hud_pixel_scale
+	relic_label.position = Vector2(margin, screen.y - 28) * _hud_pixel_scale
+	relic_label.size = Vector2(180, 20)
+	relic_label.add_theme_font_size_override("font_size", 12)
+	enemy_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	enemy_label.scale = Vector2.ONE * _hud_pixel_scale
+	enemy_label.position = Vector2((screen.x - 260) * 0.5, 148) * _hud_pixel_scale
+	enemy_label.size = Vector2(260, 24)
+	var result_size := Vector2(minf(400, screen.x - 24), minf(220, screen.y - 24))
+	_place_compact_panel(result_panel, Rect2((screen - result_size) * 0.5, result_size))
 	result_panel.get_node("Layout").offset_bottom = -64
 	var restart: Button = result_panel.get_node("Restart")
 	restart.position = Vector2(24, result_size.y - 58)
 	restart.size = Vector2(result_size.x - 48, 42)
-	# Scroll text when it exceeds its allotted lane; never reduce the font to fit.
-	for key in ["objective", "tutorial", "result"]:
-		_hud_columns[key].custom_minimum_size.x = 0
+
+func _place_compact_panel(panel: Control, rect: Rect2) -> void:
+	_place_panel(panel, Rect2(rect.position * _hud_pixel_scale, rect.size))
+	panel.scale = Vector2.ONE * _hud_pixel_scale
+
+func _update_objective_visibility(delta: float) -> void:
+	var panel: Control = $Interface/ObjectivePanel
+	if _round_finished:
+		panel.hide()
+		_objective_toggle.hide()
+		return
+	if not get_tree().paused:
+		_objective_time_left = maxf(0, _objective_time_left - delta)
+	var mouse := _objective_mouse_position
+	var hovering := _objective_toggle.get_global_rect().has_point(mouse)
+	if panel.visible:
+		hovering = hovering or panel.get_global_rect().has_point(mouse)
+	panel.visible = _objective_pinned or hovering or _objective_time_left > 0
+	_objective_toggle.text = "Missão ▴" if _objective_pinned else "Missão ▾"
 
 
 ## Monitora requisitos e proximidade dos marcadores C e B desenhados no blueprint.
 func _process(_delta: float) -> void:
+	_update_objective_visibility(_delta)
 	if get_tree().paused or _round_finished or not is_instance_valid(player):
 		return
 	if _stage == EncounterStage.MOVEMENT_TUTORIAL:
@@ -444,6 +504,8 @@ func _begin_boss_fight(skip_card := false) -> void:
 
 ## Atualiza o dispositivo de entrada, alterna fullscreen/debug e mantém atalhos globais ativos.
 func _input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion:
+		_objective_mouse_position = event.position
 	if DialogueManager.is_playing():
 		return
 	if event.is_action_pressed("ui_cancel"):
@@ -603,6 +665,11 @@ func _set_stage_text(text: String) -> void:
 ## Atualiza o objetivo principal sem espalhar acesso direto ao HUD.
 func _set_objective(text: String) -> void:
 	objective_label.text = text
+	_objective_time_left = 5.0
+	_objective_pinned = false
+	_objective_toggle.set_pressed_no_signal(false)
+	$Interface/ObjectivePanel.get_node("Layout/TextScroll").scroll_vertical = 0
+	_update_objective_visibility(0.0)
 
 
 ## Exibe o resultado somente na derrota ou quando o jogador realmente atravessa a saída.

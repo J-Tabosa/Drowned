@@ -30,7 +30,7 @@ grow_horizontal = 2
 color = Color(0.25, 0.78, 0.84, 0.8)
 mouse_filter = 2
 
-[node name="Center" type="ScrollContainer" parent="."]
+[node name="Center" type="CenterContainer" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -42,13 +42,10 @@ offset_bottom = -26.0
 grow_horizontal = 2
 grow_vertical = 2
 
-horizontal_scroll_mode = 0
-follow_focus = true
 
 [node name="Content" type="VBoxContainer" parent="Center"]
 layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/separation = 14
+theme_override_constants/separation = 10
 
 [node name="Eyebrow" type="Label" parent="Center/Content"]
 layout_mode = 2
@@ -59,7 +56,7 @@ horizontal_alignment = 1
 
 [node name="Title" type="Label" parent="Center/Content"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 38
+theme_override_font_sizes/font_size = 28
 text = "Escolha seu personagem"
 horizontal_alignment = 1
 
@@ -71,13 +68,13 @@ text = "Cada sobrevivente responde aos mesmos controles, mas possui uma ação p
 horizontal_alignment = 1
 
 [node name="Spacer" type="Control" parent="Center/Content"]
-custom_minimum_size = Vector2(0, 8)
+custom_minimum_size = Vector2(0, 4)
 layout_mode = 2
 
 [node name="Cards" type="HBoxContainer" parent="Center/Content"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_constants/separation = 18
+theme_override_constants/separation = 16
 alignment = 1
 
 [node name="Hint" type="Label" parent="Center/Content"]
