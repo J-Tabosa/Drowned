@@ -6,6 +6,9 @@ var damage := 25.0
 var knockback_force := 210.0
 var _world_bounds := Rect2(-80, -80, 2460, 1560)
 var _flight_time := 0.0
+var pierce_count := 1
+var _hit_targets: Dictionary = {}
+var _arena: Node2D
 
 
 ## Configura aparência, direção e dano antes de o projétil entrar na árvore da cena.
@@ -15,7 +18,7 @@ func setup(_projectile_color: Color, travel_direction: Vector2, attack_damage: f
 	speed = travel_speed
 	knockback_force = projectile_knockback
 	rotation = direction.angle()
-	$Body.color = Color("73d3df")
+	$Body.color = _projectile_color.lerp(Color("73d3df"), 0.4)
 
 
 ## Conecta a colisão do projétil às Hurtboxes de inimigos.
@@ -23,6 +26,7 @@ func _ready() -> void:
 	area_entered.connect(_on_area_entered)
 	var arena := get_tree().get_first_node_in_group("walkable_area")
 	if is_instance_valid(arena):
+		_arena = arena as Node2D
 		_world_bounds = arena.get_world_rect().grow(80.0)
 
 
@@ -40,12 +44,23 @@ func _process(delta: float) -> void:
 
 ## Move o disparo em linha reta e o remove quando ele deixa os limites amplos do mapa.
 func _physics_process(delta: float) -> void:
-	global_position += direction * speed * delta
-	if not _world_bounds.has_point(global_position):
+	var target := global_position + direction * speed * delta
+	if is_instance_valid(_arena) and _arena.has_method("get_farthest_walkable_position"):
+		var reachable: Vector2 = _arena.get_farthest_walkable_position(global_position, target, 4.0)
+		if reachable.distance_to(target) > 6.0:
+			queue_free()
+			return
+	global_position = target
+	if _flight_time > 3.0 or not _world_bounds.has_point(global_position):
 		queue_free()
 
 
-## Aplica dano ao primeiro alvo válido e consome o projétil após o acerto.
+## Perfura a quantidade configurada de alvos, sem repetir dano no mesmo alvo.
 func _on_area_entered(area: Area2D) -> void:
+	if _hit_targets.has(area.get_instance_id()) or pierce_count <= 0:
+		return
 	if area.has_method("receive_hit") and area.receive_hit(damage, global_position, knockback_force):
-		queue_free()
+		_hit_targets[area.get_instance_id()] = true
+		pierce_count -= 1
+		if pierce_count <= 0:
+			queue_free()

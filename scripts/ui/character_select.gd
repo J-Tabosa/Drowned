@@ -10,6 +10,7 @@ var _previews: Array[TextureRect] = []
 
 ## Monta os cartões, seleciona o primeiro perfil e prepara navegação por teclado.
 func _ready() -> void:
+	MusicDirector.set_context("cavern")
 	theme = NauticalUI.theme()
 	_build_cards()
 	_update_selection()
@@ -82,6 +83,14 @@ func _build_cards() -> void:
 		description.custom_minimum_size.y = 72
 		description.add_theme_font_size_override("font_size", 13)
 		column.add_child(description)
+		for kind in ["passive", "skill"]:
+			var detail := Label.new()
+			detail.text = "%s: %s" % ["Passiva" if kind == "passive" else "Q", profile[kind + "_name"]]
+			detail.tooltip_text = profile[kind + "_description"]
+			detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			detail.add_theme_font_size_override("font_size", 12)
+			detail.add_theme_color_override("font_color", profile.color)
+			column.add_child(detail)
 
 		var button := Button.new()
 		button.text = "Escolher"
@@ -108,7 +117,8 @@ func _update_selection() -> void:
 		_card_buttons[index].text = "Selecionado" if selected else "Escolher"
 		_previews[index].scale = Vector2(1.1, 1.1) if selected else Vector2.ONE
 	var profile: Dictionary = GameState.CHARACTER_PROFILES[_selected_index]
-	hint.text = "%s  •  %s" % [profile.action_name, "Enter ou clique para jogar"]
+	hint.text = "Ataque: Espaço / clique  •  Especial: Q / botão direito  •  Enter para jogar"
+	hint.tooltip_text = "%s: %s\n%s: %s" % [profile.passive_name, profile.passive_description, profile.skill_name, profile.skill_description]
 
 
 ## Salva o personagem, toca confirmação e abre a área inicial.

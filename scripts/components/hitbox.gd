@@ -1,5 +1,7 @@
 extends Area2D
 
+signal hit_confirmed(actor: Node2D, amount: float)
+
 @export var damage := 10.0
 @export var knockback_force := 180.0
 
@@ -53,3 +55,4 @@ func _apply_hit(area: Area2D) -> void:
 		return
 	if area.receive_hit(damage, global_position, knockback_force):
 		_hit_targets[target_id] = true
+		hit_confirmed.emit(area.get_parent(), damage)

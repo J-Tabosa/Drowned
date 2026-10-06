@@ -4,6 +4,8 @@ Projeto Godot do RPG **Drowned**.
 
 ## Documentação
 
+- [`docs/gameplay_audio.md`](docs/gameplay_audio.md): passivas, habilidades especiais (Q / botão direito), trilha dinâmica e validação da integração com o GitHub.
+
 - [`docs/PROJECT_STRUCTURE.md`](docs/PROJECT_STRUCTURE.md): organização de pastas e convenções.
 - [`docs/PLAYABLE_PROTOTYPE.md`](docs/PLAYABLE_PROTOTYPE.md): fluxo jogável e controles atuais.
 - [`docs/TECHNICAL_REFERENCE.md`](docs/TECHNICAL_REFERENCE.md): arquitetura, sinais, colisões e referência de funções.

@@ -16,6 +16,11 @@ const CHARACTER_PROFILES: Array[Dictionary] = [
 		"action": "melee",
 		"action_name": "Golpe de Âncora",
 		"cooldown": 0.42,
+		"passive_name": "Maré de Ferro",
+		"passive_description": "Acertos dão +10% de dano por carga (até 3), por 8 s.",
+		"skill_name": "Âncora Giratória",
+		"skill_description": "Varre ao redor e consome as cargas para causar mais dano.",
+		"skill_cooldown": 7.0,
 	},
 	{
 		"id": "sharpshooter",
@@ -32,6 +37,11 @@ const CHARACTER_PROFILES: Array[Dictionary] = [
 		"action": "shoot",
 		"action_name": "Disparo de Arpão",
 		"cooldown": 0.68,
+		"passive_name": "Mira Firme",
+		"passive_description": "Pare por 0,9 s: o próximo arpão ganha +40% de dano e perfura 2 alvos.",
+		"skill_name": "Salva de Arpões",
+		"skill_description": "Dispara 5 arpões em leque que atravessam até 3 alvos cada.",
+		"skill_cooldown": 6.0,
 	},
 	{
 		"id": "diver",
@@ -48,6 +58,11 @@ const CHARACTER_PROFILES: Array[Dictionary] = [
 		"action": "dive",
 		"action_name": "Mergulho Abissal",
 		"cooldown": 1.1,
+		"passive_name": "Segundo Fôlego",
+		"passive_description": "Acertar o retorno do mergulho cura 6 de vida e dá +20% de velocidade por 2 s.",
+		"skill_name": "Correnteza Abissal",
+		"skill_description": "Cria uma correnteza no cursor: 5 pulsos puxam e ferem inimigos.",
+		"skill_cooldown": 8.0,
 	},
 ]
 

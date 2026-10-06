@@ -78,10 +78,14 @@ var _cooldown_label: Label
 var _feedback_time := 0.0
 var _last_gate := ""
 var _reject_wait := 0.0
+var _skill_label: Label
+var _skill_bar: ProgressBar
+var _passive_label: Label
 
 
 ## Inicializa jogador e HUD usando exclusivamente marcadores fornecidos pelo blueprint do mapa.
 func _ready() -> void:
+	MusicDirector.set_context("cavern")
 	_developer_mode = OS.get_cmdline_args().has("--debug")
 	developer_panel.visible = _developer_mode
 	pause_panel.visible = false
@@ -211,7 +215,22 @@ func _style_hud() -> void:
 		result_panel, $Interface/PausePanel/PauseCard, settings_card]:
 		node.theme = NauticalUI.theme(accent)
 		NauticalUI.skin(node)
-	_hud_columns["status"] = NauticalUI.column($Interface/TopPanel, [character_label, health_label, health_bar, action_label, cooldown_bar])
+	_hud_columns["status"] = NauticalUI.column($Interface/TopPanel, [character_label, health_label, health_bar, action_label, cooldown_bar, _cooldown_label])
+	_cooldown_label.add_theme_font_size_override("font_size", 10)
+	_skill_label = Label.new()
+	_skill_label.add_theme_font_size_override("font_size", 12)
+	_skill_label.tooltip_text = GameState.get_selected_profile().skill_description
+	_hud_columns["status"].add_child(_skill_label)
+	_skill_bar = ProgressBar.new()
+	_skill_bar.show_percentage = false
+	_skill_bar.custom_minimum_size.y = 5
+	_hud_columns["status"].add_child(_skill_bar)
+	_style_bar(_skill_bar, accent)
+	_passive_label = Label.new()
+	_passive_label.add_theme_font_size_override("font_size", 11)
+	_passive_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_passive_label.tooltip_text = GameState.get_selected_profile().passive_description
+	_hud_columns["status"].add_child(_passive_label)
 	_hud_columns["objective"] = NauticalUI.column($Interface/ObjectivePanel, [stage_label, objective_label], true)
 	_hud_columns["tutorial"] = NauticalUI.column(tutorial_panel, [tutorial_title, tutorial_step, tutorial_progress], true)
 	_hud_columns["boss"] = NauticalUI.column(boss_panel, [boss_name_label, boss_health_bar])
@@ -223,6 +242,26 @@ func _style_hud() -> void:
 	settings_card.add_child(speed)
 	speed.position = Vector2(24, 178)
 	speed.size = Vector2(300, 42)
+	var music_row := HBoxContainer.new()
+	music_row.name = "MusicVolume"
+	settings_card.add_child(music_row)
+	music_row.position = Vector2(24, 226)
+	music_row.size = Vector2(300, 32)
+	var music_label := Label.new()
+	music_label.text = "Música"
+	music_row.add_child(music_label)
+	var volume := HSlider.new()
+	volume.min_value = 0.0
+	volume.max_value = 1.0
+	volume.step = 0.05
+	volume.value = MusicDirector.music_volume
+	volume.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	music_row.add_child(volume)
+	volume.value_changed.connect(MusicDirector.set_music_volume)
+	settings_card.offset_top = -174.0
+	settings_card.offset_bottom = 174.0
+	var close_settings: Button = settings_card.get_node("CloseSettings")
+	close_settings.position.y = 280.0
 	_style_bar(health_bar, Color("de6572"))
 	_style_bar(cooldown_bar, accent)
 	_style_bar(tutorial_progress, Color("52d7b0"))
@@ -284,7 +323,7 @@ func _layout_hud() -> void:
 	var width := minf(280.0, screen.x * 0.42)
 	var objective_width := minf(360.0, screen.x - width - margin * 3)
 	var objective_x := maxf(width + margin * 2, (screen.x - objective_width) * 0.5)
-	_place_compact_panel($Interface/TopPanel, Rect2(margin, margin, width, 126))
+	_place_compact_panel($Interface/TopPanel, Rect2(margin, margin, width, 184))
 	_place_compact_panel($Interface/ObjectivePanel, Rect2(objective_x, 44, objective_width, 94))
 	_place_compact_panel(_objective_toggle, Rect2(objective_x + objective_width - 100, margin, 100, 26))
 	var context_width := minf(300.0, screen.x * 0.44)
@@ -306,7 +345,7 @@ func _layout_hud() -> void:
 	restart.position = Vector2(24, result_size.y - 58)
 	restart.size = Vector2(result_size.x - 48, 42)
 	_feedback_label.scale = Vector2.ONE * _hud_pixel_scale
-	_feedback_label.position = Vector2(margin, 170) * _hud_pixel_scale
+	_feedback_label.position = Vector2(margin, 206) * _hud_pixel_scale
 	_feedback_label.size = Vector2(screen.x - margin * 2.0, 56)
 
 func _place_compact_panel(panel: Control, rect: Rect2) -> void:
@@ -343,6 +382,7 @@ func _process(delta: float) -> void:
 	if not player.can_receive_damage():
 		_cooldown_label.text = "INVULNERÁVEL • " + _cooldown_label.text
 	_cooldown_label.add_theme_color_override("font_color", Color("80e5ec") if not player.can_receive_damage() else Color("83dfbe") if remaining == 0.0 else Color("bdcbd4"))
+	_refresh_skill_status()
 	_check_gate_interaction()
 	if _stage == EncounterStage.MOVEMENT_TUTORIAL:
 		_track_tutorial()
@@ -374,11 +414,15 @@ func _spawn_player() -> void:
 	player.action_rejected.connect(_on_action_rejected)
 	player.invulnerability_changed.connect(_on_invulnerability_changed)
 	player.health_component.damaged.connect(_on_player_damaged)
+	player.skill_used.connect(_on_skill_used)
+	player.skill_rejected.connect(_on_skill_rejected)
+	player.passive_triggered.connect(_on_passive_triggered)
 	character_label.text = profile.name
 	character_label.add_theme_color_override("font_color", profile.color)
 	cooldown_bar.value = 100.0
 	_on_player_health_changed(player.health_component.current_health, player.health_component.max_health)
 	_refresh_action_prompt()
+	_refresh_skill_status()
 
 
 ## Acompanha deslocamento, corrida com Ctrl e habilidade sem depender de uma posição específica.
@@ -479,6 +523,7 @@ func _start_combat_encounter() -> void:
 	if _combat_spawned or _round_finished:
 		return
 	_combat_spawned = true
+	MusicDirector.set_context("waves")
 	_stage = EncounterStage.COMBAT
 	tutorial_panel.visible = false
 	_set_stage_text("2/3  CÂMARA DOS AFOGADOS")
@@ -519,6 +564,7 @@ func _queue_next_combat_wave() -> void:
 
 
 func _begin_boss_reveal() -> void:
+	MusicDirector.set_context("cavern")
 	_stage = EncounterStage.BOSS_REVEAL
 	_run_boss_reveal(skip_cinematics_for_tests, skip_cinematics_for_tests)
 
@@ -606,6 +652,7 @@ func _begin_boss_fight(skip_card := false) -> void:
 	if _stage != EncounterStage.REACH_BOSS or not is_instance_valid(_boss):
 		return
 	_stage = EncounterStage.BOSS_PRESENTATION
+	MusicDirector.set_context("boss")
 	player.set_controls_enabled(false)
 	if not skip_card:
 		await boss_intro_card.play(
@@ -714,7 +761,7 @@ func _refresh_action_prompt() -> void:
 			movement_prompt = "analógico esquerdo"
 			sprint_prompt = "botão de corrida"
 	action_label.text = "%s: %s" % [action_prompt, profile.action_name]
-	controls_label.text = "%s: mover    •    %s: correr    •    %s: habilidade    •    Esc: pausa    •    F11: tela cheia" % [movement_prompt, sprint_prompt, action_prompt]
+	controls_label.text = "%s: mover  •  %s: correr  •  %s: ataque  •  Q / botão direito: especial  •  Esc: pausa  •  F11: tela cheia" % [movement_prompt, sprint_prompt, action_prompt]
 
 
 ## Reinicia a recarga visual e registra o uso da habilidade no tutorial.
@@ -753,6 +800,7 @@ func _on_enemy_defeated() -> void:
 		else:
 			_begin_boss_reveal()
 	elif _stage == EncounterStage.BOSS and _enemies_alive == 0:
+		MusicDirector.set_context("cavern")
 		arena.mark_boss_defeated()
 		_objective_completed("Guardião derrotado — selo do portão rompido")
 		_stage = EncounterStage.REACH_EXIT
@@ -795,6 +843,7 @@ func _set_objective(text: String) -> void:
 
 ## Exibe o resultado somente na derrota ou quando o jogador realmente atravessa a saída.
 func _finish_round(victory: bool) -> void:
+	MusicDirector.set_context("cavern")
 	if victory:
 		_objective_completed("Prólogo concluído")
 	_feedback_label.visible = false
@@ -838,4 +887,28 @@ func _on_restart_pressed() -> void:
 ## Abre novamente a seleção para testar outro perfil.
 func _on_change_character_pressed() -> void:
 	get_tree().paused = false
+	MusicDirector.set_context("cavern")
 	get_tree().change_scene_to_file("res://scenes/ui/menus/character_select.tscn")
+
+
+func _refresh_skill_status() -> void:
+	var remaining: float = player.skill_cooldown_remaining
+	_skill_bar.value = 100.0 * (1.0 - remaining / float(player.profile.skill_cooldown))
+	_skill_label.text = "Q · %s · %s" % [player.profile.skill_name, "PRONTA" if remaining == 0.0 else "%.1f s" % remaining]
+	_skill_label.add_theme_color_override("font_color", player.profile.color if remaining == 0.0 else Color("bdcbd4"))
+	_passive_label.text = player.get_passive_status()
+
+
+func _on_skill_used(skill_name: String, _cooldown: float) -> void:
+	_notify(skill_name, player.profile.color, "protect")
+	FEEDBACK.pulse(_skill_label, player.profile.color)
+
+
+func _on_skill_rejected() -> void:
+	if _reject_wait <= 0.0:
+		_notify("Especial recarregando ou ataque em andamento.", Color("efb46b"), "blocked")
+		_reject_wait = 0.45
+
+
+func _on_passive_triggered(_passive_name: String) -> void:
+	FEEDBACK.pulse(_passive_label, player.profile.color)

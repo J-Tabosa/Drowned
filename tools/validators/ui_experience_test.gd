@@ -81,6 +81,13 @@ func _run() -> void:
 		candidate.skip_cinematics_for_tests = true
 		root.add_child(candidate)
 		assert(candidate.cooldown_bar.get_theme_stylebox("fill").bg_color == profile.color)
+		for resolution in [Vector2i(640, 360), Vector2i(1152, 648)]:
+			root.size = resolution
+			await _settle()
+			var status: Control = candidate.get_node("Interface/TopPanel")
+			assert(status.get_global_rect().encloses(candidate._passive_label.get_global_rect()), "Passive must fit inside compact HUD")
+			assert(status.get_global_rect().encloses(candidate._skill_label.get_global_rect()), "Special must fit inside compact HUD")
+			await _capture("abilities_" + profile.id + "_" + str(resolution.x))
 		candidate.queue_free()
 		await process_frame
 	scene._on_pause_settings_pressed()

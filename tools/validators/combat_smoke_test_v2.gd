@@ -118,6 +118,7 @@ func _run() -> void:
 	assert(victory_lab.arena.is_tutorial_gate_open())
 
 	victory_lab._start_combat_encounter()
+	assert(root.get_node("MusicDirector").context == "waves")
 	for expected_wave_size in [4, 5, 6]:
 		assert(victory_lab._enemies_alive == expected_wave_size)
 		for enemy in get_nodes_in_group("enemies"):
@@ -126,11 +127,13 @@ func _run() -> void:
 		await process_frame
 		await process_frame
 	assert(victory_lab.arena.is_boss_gate_open())
+	assert(root.get_node("MusicDirector").context == "cavern")
 	assert(is_instance_valid(victory_lab._boss))
 	assert(victory_lab._boss.health_component.max_health == 700.0)
 	assert(not victory_lab._boss.can_receive_damage())
 
 	victory_lab._begin_boss_fight(true)
+	assert(root.get_node("MusicDirector").context == "boss")
 	await process_frame
 	assert(victory_lab._boss.can_receive_damage())
 	assert(victory_lab.boss_panel.visible)
@@ -144,6 +147,7 @@ func _run() -> void:
 
 	victory_lab._boss.health_component.kill()
 	await process_frame
+	assert(root.get_node("MusicDirector").context == "cavern")
 	assert(not victory_lab.arena.is_post_boss_gate_open())
 	assert(not victory_lab.arena.open_post_boss_gate())
 	assert(victory_lab.arena._exit_gate_art.modulate.a == 1.0)

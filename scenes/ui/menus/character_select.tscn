@@ -64,7 +64,7 @@ horizontal_alignment = 1
 layout_mode = 2
 theme_override_colors/font_color = Color(0.67, 0.76, 0.82, 1)
 theme_override_font_sizes/font_size = 16
-text = "Cada sobrevivente responde aos mesmos controles, mas possui uma ação própria."
+text = "Cada sobrevivente tem seu ataque, uma passiva e uma habilidade especial."
 horizontal_alignment = 1
 
 [node name="Spacer" type="Control" parent="Center/Content"]

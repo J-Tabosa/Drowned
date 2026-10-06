@@ -6,10 +6,15 @@ signal died
 signal action_ready
 signal action_rejected
 signal invulnerability_changed(active: bool)
+signal skill_used(skill_name: String, cooldown: float)
+signal skill_rejected
+signal passive_triggered(passive_name: String)
 
 const SPRINT_MULTIPLIER := 1.55
 const BASE_VISUAL_SCALE := Vector2.ONE
 const ANCHOR_WIND_TEXTURE := preload("res://assets/sprites/effects/anchor_wind_sweep.png")
+const FEEDBACK := preload("res://scripts/components/gameplay_feedback.gd")
+const PROJECTILE := preload("res://scenes/gameplay/combat/placeholder_projectile.tscn")
 
 @onready var body: CharacterAnimation = %Body
 @onready var shadow: Polygon2D = %Shadow
@@ -33,11 +38,36 @@ var _base_collision_mask := 0
 var cooldown_remaining := 0.0
 var _invulnerability_visible := false
 var _damage_tween: Tween
+var skill_cooldown_remaining := 0.0
+var _skill_busy := false
+var _momentum := 0
+var _momentum_time := 0.0
+var _steady_time := 0.0
+var _steady_ready := false
+var _dive_healed := false
+var _flow_time := 0.0
 
 
 func _process(delta: float) -> void:
 	if _dead:
 		return
+	if not _controls_enabled:
+		return
+	skill_cooldown_remaining = maxf(0.0, skill_cooldown_remaining - delta)
+	_momentum_time = maxf(0.0, _momentum_time - delta)
+	_flow_time = maxf(0.0, _flow_time - delta)
+	if _momentum_time == 0.0:
+		_momentum = 0
+	if profile.id == "sharpshooter":
+		var moving := Input.get_vector("move_left", "move_right", "move_up", "move_down").length_squared() > 0.01
+		if moving or _knockback_velocity.length() > 5.0:
+			_steady_time = 0.0
+			_steady_ready = false
+		elif not body.is_action_playing() and not _skill_busy:
+			_steady_time += delta
+			if _steady_time >= 0.9 and not _steady_ready:
+				_steady_ready = true
+				passive_triggered.emit(profile.passive_name)
 	if cooldown_remaining > 0.0:
 		cooldown_remaining = maxf(0.0, cooldown_remaining - delta)
 		if cooldown_remaining == 0.0:
@@ -72,6 +102,8 @@ func _ready() -> void:
 	health_component.health_changed.connect(func(current: float, maximum: float) -> void: health_changed.emit(current, maximum))
 	health_component.damaged.connect(_on_damaged)
 	health_component.died.connect(_on_died)
+	for hitbox in [melee_hitbox, dash_hitbox, dive_hitbox]:
+		hitbox.hit_confirmed.connect(_on_primary_hit.bind(hitbox == dive_hitbox))
 	_apply_profile()
 	_configure_camera()
 
@@ -97,7 +129,8 @@ func _physics_process(delta: float) -> void:
 		velocity = _dash_direction * 760.0
 	else:
 		var sprint_multiplier := SPRINT_MULTIPLIER if Input.is_action_pressed("sprint") else 1.0
-		velocity = input_vector.normalized() * float(profile.speed) * sprint_multiplier + _knockback_velocity
+		var flow_multiplier := 1.2 if _flow_time > 0.0 else 1.0
+		velocity = input_vector.normalized() * float(profile.speed) * sprint_multiplier * flow_multiplier + _knockback_velocity
 	_knockback_velocity = _knockback_velocity.move_toward(Vector2.ZERO, 850.0 * delta)
 
 	var previous_position := global_position
@@ -114,6 +147,8 @@ func _physics_process(delta: float) -> void:
 
 	if Input.is_action_just_pressed("primary_action"):
 		_use_primary_action()
+	if Input.is_action_just_pressed("special_action"):
+		_use_special_action()
 
 
 ## Transfere cor, vida, velocidade e dano do perfil para os componentes do jogador.
@@ -184,7 +219,7 @@ func is_sprinting() -> bool:
 func _use_primary_action() -> void:
 	if _dead or not _controls_enabled:
 		return
-	if not _can_act:
+	if not _can_act or _skill_busy:
 		action_rejected.emit()
 		return
 	_can_act = false
@@ -212,6 +247,7 @@ func _use_primary_action() -> void:
 
 ## Ativa o golpe quando a âncora alcança o arco principal da animação.
 func _animate_melee() -> void:
+	melee_hitbox.damage = _primary_damage()
 	var attack_direction := _get_cursor_direction(facing)
 	facing = attack_direction
 	body.flip_h = attack_direction.x < -0.08
@@ -243,23 +279,24 @@ func _animate_melee() -> void:
 
 ## Mira no cursor e lança o arpão quando a pose de disparo chega ao impacto.
 func _animate_shoot() -> void:
+	var aimed := _steady_ready
+	_steady_ready = false
+	_steady_time = 0.0
 	var direction := _get_cursor_direction(facing)
 	facing = direction
 	body.flip_h = direction.x < -0.08
 	await get_tree().create_timer(0.24, false).timeout
 	if _dead:
 		return
-	var projectile := preload("res://scenes/gameplay/combat/placeholder_projectile.tscn").instantiate()
-	projectile.setup(profile.color, direction, float(profile.damage), 1480.0, 300.0)
-	get_parent().add_child(projectile)
 	# The animation faces horizontally: emit from the drawn harpoon muzzle,
 	# while keeping the flight direction aimed at the cursor.
 	var muzzle := Vector2(-52.0 if body.flip_h else 52.0, -14.0)
-	projectile.global_position = body.to_global(muzzle)
+	_fire_harpoon(direction, float(profile.damage) * (1.4 if aimed else 1.0), 2 if aimed else 1, body.to_global(muzzle))
 
 
 ## Marca um ponto no cursor e mergulha até ele, causando dano em área ao retornar.
 func _animate_dive() -> void:
+	_dive_healed = false
 	_diving = true
 	set_collision_mask_value(2, false)
 	var direction := _get_cursor_direction(facing)
@@ -402,6 +439,7 @@ func _on_damaged(_amount: float, _source_position: Vector2) -> void:
 ## Interrompe controles, achata o placeholder e comunica a derrota à arena.
 func _on_died() -> void:
 	_dead = true
+	_skill_busy = false
 	for hitbox in [melee_hitbox, dash_hitbox, dive_hitbox]:
 		hitbox.deactivate()
 	_invulnerability_visible = false
@@ -416,3 +454,144 @@ func _on_died() -> void:
 	body.modulate = Color("5d6872")
 	body.play_death()
 	died.emit()
+
+
+func _primary_damage() -> float:
+	return float(profile.damage) * (1.0 + 0.1 * _momentum)
+
+
+## Passivas só respondem a dano confirmado, nunca a golpes no vazio.
+func _on_primary_hit(_actor: Node2D, _amount: float, dive_hit := false) -> void:
+	if _dead:
+		return
+	if profile.id == "breaker":
+		_momentum = mini(3, _momentum + 1)
+		_momentum_time = 8.0
+		if _momentum == 3:
+			passive_triggered.emit(profile.passive_name)
+	elif profile.id == "diver" and dive_hit and not _dive_healed:
+		_dive_healed = true
+		health_component.heal(6.0)
+		_flow_time = 2.0
+		passive_triggered.emit(profile.passive_name)
+		FEEDBACK.burst(get_parent(), global_position, Color("83dfbe"))
+
+
+func get_passive_status() -> String:
+	match profile.id:
+		"breaker":
+			return "%s · %d/3" % [profile.passive_name, _momentum]
+		"sharpshooter":
+			return "%s · %s" % [profile.passive_name, "PRONTA" if _steady_ready else "firme a mira"]
+		"diver":
+			return "%s · %s" % [profile.passive_name, "+20% velocidade" if _flow_time > 0.0 else "acerte um mergulho"]
+	return ""
+
+
+func _fire_harpoon(direction: Vector2, damage: float, targets: int, origin: Vector2) -> void:
+	var projectile := PROJECTILE.instantiate()
+	projectile.setup(profile.color, direction, damage, 1480.0, 300.0)
+	projectile.pierce_count = targets
+	get_parent().add_child(projectile)
+	projectile.global_position = origin
+
+
+## A habilidade tem recarga própria e não pode interromper um ataque ou mergulho.
+func _use_special_action() -> void:
+	if _dead or not _controls_enabled:
+		return
+	if skill_cooldown_remaining > 0.0 or _skill_busy or _diving or _dashing or body.is_action_playing():
+		skill_rejected.emit()
+		return
+	skill_cooldown_remaining = float(profile.skill_cooldown)
+	_skill_busy = true
+	skill_used.emit(profile.skill_name, skill_cooldown_remaining)
+	body.play_action(0.55)
+	match profile.id:
+		"breaker":
+			_anchor_vortex()
+		"sharpshooter":
+			_harpoon_fan()
+		"diver":
+			_tidal_current()
+
+
+func _anchor_vortex() -> void:
+	var power := 90.0 + 15.0 * _momentum
+	_momentum = 0
+	_momentum_time = 0.0
+	_skill_ring(global_position, 210.0, profile.color, 0.4)
+	await get_tree().create_timer(0.22, false).timeout
+	if _dead:
+		return
+	_damage_nearby(global_position, 210.0, power, false)
+	FEEDBACK.sound(self, "heavy_swing")
+	await get_tree().create_timer(0.33, false).timeout
+	_skill_busy = false
+
+
+func _harpoon_fan() -> void:
+	var direction := _get_cursor_direction(facing)
+	facing = direction
+	body.flip_h = direction.x < -0.08
+	_steady_ready = false
+	_steady_time = 0.0
+	await get_tree().create_timer(0.2, false).timeout
+	if _dead:
+		return
+	var muzzle := body.to_global(Vector2(-52.0 if body.flip_h else 52.0, -14.0))
+	for index in 5:
+		_fire_harpoon(direction.rotated((index - 2) * 0.14), 36.0, 3, muzzle)
+	FEEDBACK.burst(get_parent(), muzzle, profile.color)
+	FEEDBACK.sound(self, "swish")
+	await get_tree().create_timer(0.35, false).timeout
+	_skill_busy = false
+
+
+func _tidal_current() -> void:
+	var direction := _get_cursor_direction(facing)
+	var distance := minf(360.0, global_position.distance_to(get_global_mouse_position()))
+	var center := _find_dive_target(global_position + direction * distance)
+	await get_tree().create_timer(0.2, false).timeout
+	if _dead:
+		return
+	_skill_busy = false
+	for pulse in 5:
+		if _dead:
+			return
+		_skill_ring(center, 210.0, profile.color, 0.6, true)
+		_damage_nearby(center, 210.0, 16.0, true)
+		FEEDBACK.sound(self, "protect")
+		await get_tree().create_timer(0.65, false).timeout
+
+
+func _damage_nearby(center: Vector2, radius: float, damage: float, pull: bool) -> void:
+	for enemy: Node2D in get_tree().get_nodes_in_group("enemies"):
+		if enemy.global_position.distance_to(center) > radius:
+			continue
+		if is_instance_valid(_arena) and _arena.has_method("get_farthest_walkable_position"):
+			var reachable: Vector2 = _arena.get_farthest_walkable_position(center, enemy.global_position, 4.0)
+			if reachable.distance_to(enemy.global_position) > 12.0:
+				continue
+		var hurtbox := enemy.get_node_or_null("Hurtbox")
+		if hurtbox == null:
+			continue
+		var source := enemy.global_position + (enemy.global_position - center) if pull else center
+		hurtbox.receive_hit(damage, source, 140.0 if pull else 520.0)
+
+
+func _skill_ring(center: Vector2, radius: float, tint: Color, duration: float, inward := false) -> void:
+	var ring := Line2D.new()
+	ring.width = 5.0
+	ring.default_color = tint
+	ring.antialiased = true
+	ring.process_mode = Node.PROCESS_MODE_PAUSABLE
+	for index in 49:
+		ring.add_point(Vector2.from_angle(TAU * index / 48.0) * radius)
+	get_parent().add_child(ring)
+	ring.global_position = center
+	ring.scale = Vector2.ONE if inward else Vector2.ONE * 0.15
+	var tween := ring.create_tween().set_parallel(true)
+	tween.tween_property(ring, "scale", Vector2.ONE * (0.1 if inward else 1.0), duration)
+	tween.tween_property(ring, "modulate:a", 0.0, duration)
+	tween.chain().tween_callback(ring.queue_free)
