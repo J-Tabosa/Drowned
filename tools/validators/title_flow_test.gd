@@ -17,6 +17,7 @@ func _run() -> void:
 	var manager: Node = root.get_node("DialogueManager")
 	var state: Node = root.get_node("GameState")
 	var original_speed: int = state.dialogue_speed_index
+	var original_volume: float = music.music_volume
 	if transition.busy:
 		await transition.revealed
 	var title: Variant = load("res://scenes/ui/menus/title_screen.tscn").instantiate()
@@ -25,13 +26,41 @@ func _run() -> void:
 	await process_frame
 	assert(ProjectSettings.get_setting("application/run/main_scene").ends_with("title_screen.tscn"))
 	assert(title.get_node("PixelOcean/OceanViewport").size == Vector2i(320, 180))
-	assert(title.ocean._crew.size() == 3)
-	for index in 3:
-		var sailor: Sprite2D = title.ocean._crew[index]
-		assert(sailor.texture is AtlasTexture)
-		assert(sailor.texture.atlas.resource_path == title.ocean.CREW_SOURCES[index],
-			"Boat passengers must use the exact original artwork")
-		assert(sailor.get_parent() == title.ocean._boat, "Crew must move with the hull")
+	assert(title.ocean._boat.get_child_count() == 1, "The boat must have no passengers")
+	assert(title.ocean._boat.get_node("Stern").texture.get_size() == Vector2(104, 128))
+	assert(title._menu_buttons.size() == 4)
+	for dimensions in [Vector2i(640, 360), Vector2i(960, 540), Vector2i(1920, 1080), Vector2i(1280, 720)]:
+		root.size = dimensions
+		await process_frame
+		title._layout()
+		await process_frame
+		var screen_size: Vector2 = title.get_viewport().get_visible_rect().size
+		for button in title._menu_buttons:
+			var bounds: Rect2 = button.get_global_rect()
+			assert(bounds.position.x >= 0 and bounds.end.x < screen_size.x * 0.5)
+			assert(bounds.position.y >= 0 and bounds.end.y <= screen_size.y)
+			assert(button.size.x >= button.get_minimum_size().x)
+			assert(button.size.y >= button.get_minimum_size().y)
+	title._menu_buttons[1].pressed.emit()
+	await process_frame
+	await process_frame
+	assert(title._settings.visible and title._modal_shade.visible)
+	assert(Rect2(Vector2.ZERO, title.get_viewport().get_visible_rect().size).encloses(title._settings.get_global_rect()))
+	assert(title.play_button.disabled)
+	title._speed.item_selected.emit(2)
+	assert(state.dialogue_speed_index == 2)
+	title._volume.value = 0.4
+	assert(is_equal_approx(music.music_volume, 0.4))
+	title._close_settings.pressed.emit()
+	assert(not title._settings.visible and not title.play_button.disabled)
+	title._menu_buttons[2].pressed.emit()
+	await process_frame
+	await process_frame
+	assert(title._credits.visible and title._modal_shade.visible)
+	assert(Rect2(Vector2.ZERO, title.get_viewport().get_visible_rect().size).encloses(title._credits.get_global_rect()))
+	title._close_credits.pressed.emit()
+	state.set_dialogue_speed(original_speed)
+	music.set_music_volume(original_volume)
 	var calm_position: Vector2 = title.ocean._boat.position
 	var calm_rotation: float = title.ocean._boat.rotation
 	title.ocean.manual_time = true
@@ -50,6 +79,7 @@ func _run() -> void:
 	assert(title.ocean.animation_time > 0.0)
 	title._start_game(0.5)
 	assert(title._starting and title.play_button.disabled)
+	assert(title._rain_audio.playing)
 	await create_timer(0.2).timeout
 	assert(title.ocean.storm > 0.0 and title.ocean.storm < 1.0)
 	await _wait_scene("CharacterSelect")

@@ -15,11 +15,13 @@ def main():
     paths = sorted(FRAMES.glob("boat_*.png"))
     assert len(paths) == 48, f"Expected 48 rendered frames, got {len(paths)}"
     frames = []
+    with Image.open(paths[0]) as first:
+        palette = first.convert("RGB").quantize(colors=128, dither=Image.Dither.NONE)
     for path in paths:
         with Image.open(path) as source:
-            frames.append(source.convert("RGB").quantize(colors=256))
+            frames.append(source.convert("RGB").quantize(palette=palette, dither=Image.Dither.NONE))
     frames[0].save(OUTPUT, save_all=True, append_images=frames[1:], duration=100,
-                   loop=0, disposal=2, optimize=False)
+                   loop=0, disposal=1, optimize=True)
     with Image.open(OUTPUT) as saved:
         assert saved.n_frames == 48
         assert saved.info["loop"] == 0

@@ -6,6 +6,18 @@ func _initialize() -> void:
 
 
 func _run() -> void:
+	# Status notifications and unknown cues must remain silent; real actions play.
+	var feedback: Variant = load("res://scripts/components/gameplay_feedback.gd")
+	var audio_host := Node.new()
+	root.add_child(audio_host)
+	for cue in ["ready", "blocked", "complete", "boss_warning", "unmapped_debug_cue"]:
+		feedback.sound(audio_host, cue)
+	assert(audio_host.get_child_count() == 0, "No debug beeps for semantic notifications")
+	for cue in ["swish", "hit", "key", "gate", "protect"]:
+		feedback.sound(audio_host, cue)
+	assert(audio_host.get_child_count() == 5, "Action sounds must remain audible")
+	audio_host.queue_free()
+	await process_frame
 	root.get_node("GameState").select_character("diver")
 	var lab = load("res://scenes/world/areas/movement_lab.tscn").instantiate()
 	root.add_child(lab)

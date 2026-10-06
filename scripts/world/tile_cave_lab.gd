@@ -150,7 +150,7 @@ func _notify(text: String, tint: Color, cue := "") -> void:
 
 
 func _objective_completed(text: String) -> void:
-	_notify("✓ " + text, Color("83dfbe"), "complete")
+	_notify("✓ " + text, Color("83dfbe"))
 	FEEDBACK.pulse(objective_label, Color("83dfbe"))
 	FEEDBACK.burst(self, player.global_position, Color("83dfbe"))
 
@@ -169,7 +169,7 @@ func _check_gate_interaction() -> void:
 	if nearby == "post_boss" and _stage == EncounterStage.REACH_EXIT and arena.has_exit_key():
 		arena.open_post_boss_gate()
 	elif not nearby.is_empty() and nearby != _last_gate:
-		_notify(arena.get_gate_hint(nearby), Color("efb46b"), "blocked")
+		_notify(arena.get_gate_hint(nearby), Color("efb46b"))
 	_last_gate = nearby
 
 
@@ -177,7 +177,6 @@ func _on_action_ready() -> void:
 	if _round_finished:
 		return
 	FEEDBACK.pulse(cooldown_bar, Color("83dfbe"))
-	FEEDBACK.sound(self, "ready")
 
 
 func _on_action_rejected() -> void:
@@ -186,13 +185,11 @@ func _on_action_rejected() -> void:
 	_reject_wait = 0.4
 	FEEDBACK.pulse(cooldown_bar, Color("efb46b"))
 	FEEDBACK.pulse(_cooldown_label, Color("efb46b"))
-	FEEDBACK.sound(self, "blocked")
 
 
 func _on_invulnerability_changed(active: bool) -> void:
 	if active:
 		FEEDBACK.burst(self, player.global_position, Color("80e5ec"))
-		FEEDBACK.sound(self, "protect")
 
 
 func _on_player_damaged(amount: float, source: Vector2) -> void:
@@ -906,7 +903,7 @@ func _on_skill_used(skill_name: String, _cooldown: float) -> void:
 
 func _on_skill_rejected() -> void:
 	if _reject_wait <= 0.0:
-		_notify("Especial recarregando ou ataque em andamento.", Color("efb46b"), "blocked")
+		_notify("Especial recarregando ou ataque em andamento.", Color("efb46b"))
 		_reject_wait = 0.45
 
 

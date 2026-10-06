@@ -41,6 +41,23 @@ static func theme(accent: Color = Color("42c6d7")) -> Theme:
 	result.set_stylebox("panel", "PanelContainer", panel_style())
 	return result
 
+
+## Reuses the existing brass/rope frame for the title menu and modal buttons.
+static func title_button(button: Button) -> void:
+	button.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	for state in ["normal", "hover", "pressed", "disabled"]:
+		var style := panel_style()
+		if style is StyleBoxTexture:
+			style.set_content_margin_all(8)
+			style.modulate_color = {"normal": Color.WHITE, "hover": Color("baf5ed"),
+				"pressed": Color("82b4c0"), "disabled": Color("73828b")}[state]
+		button.add_theme_stylebox_override(state, style)
+	var focus := StyleBoxFlat.new()
+	focus.bg_color = Color.TRANSPARENT
+	focus.border_color = PAPER
+	focus.set_border_width_all(1)
+	button.add_theme_stylebox_override("focus", focus)
+
 static func skin(control: ColorRect) -> void:
 	control.color = Color.TRANSPARENT
 	control.mouse_filter = Control.MOUSE_FILTER_IGNORE

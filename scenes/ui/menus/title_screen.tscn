@@ -27,7 +27,7 @@ grow_vertical = 2
 mouse_filter = 2
 texture = SubResource("ViewportTexture_ocean")
 expand_mode = 1
-stretch_mode = 0
+stretch_mode = 6
 
 [node name="OceanViewport" type="SubViewport" parent="PixelOcean"]
 disable_3d = true
