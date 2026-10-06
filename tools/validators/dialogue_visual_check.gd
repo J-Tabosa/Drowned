@@ -8,6 +8,8 @@ func _initialize() -> void:
 
 
 func _run() -> void:
+	if root.get_node("SceneTransition").busy:
+		await root.get_node("SceneTransition").revealed
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
 	var small := OS.get_environment("DROWNED_VISUAL_SMALL") == "1"
 	root.size = Vector2i(640, 360) if small else Vector2i(1152, 648)
@@ -30,7 +32,7 @@ func _run() -> void:
 		await create_timer(0.85).timeout
 		assert(overlay._line_index == 0)
 		print("dialogue viewport/window: ", overlay.get_viewport().get_visible_rect().size, " / ", root.size)
-		assert(absf(overlay.left_portrait.size.y / overlay.get_viewport().get_visible_rect().size.y - 0.66) < 0.01)
+		assert(absf(overlay.left_portrait.size.y / overlay.get_viewport().get_visible_rect().size.y - 0.78) < 0.01)
 		assert(Rect2(Vector2.ZERO, overlay.get_viewport().get_visible_rect().size).encloses(Rect2(overlay.dialogue_box.position, overlay.dialogue_box.size * overlay.dialogue_box.scale)))
 		assert(overlay._typing)
 		print(character_id, " regions: ", (overlay.left_texture.texture as AtlasTexture).region, " / ", (overlay.center_texture.texture as AtlasTexture).region, " / ", (overlay.right_texture.texture as AtlasTexture).region)

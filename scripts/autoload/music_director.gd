@@ -14,7 +14,7 @@ var _transition: Tween
 
 
 func _ready() -> void:
-	process_mode = Node.PROCESS_MODE_PAUSABLE
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	var config := ConfigFile.new()
 	if config.load("user://preferences.cfg") == OK:
 		music_volume = clampf(float(config.get_value("audio", "music_volume", 0.65)), 0.0, 1.0)
@@ -33,6 +33,13 @@ func _ready() -> void:
 	for audio in _players:
 		audio.play()
 	set_context("cavern", 0.8)
+
+
+func _process(_delta: float) -> void:
+	# Dialogue pauses combat, while the score keeps its underwater atmosphere.
+	var menu_paused := get_tree().paused and not DialogueManager.is_playing()
+	for audio in _players:
+		audio.stream_paused = menu_paused
 
 
 func set_context(next: String, fade := 1.5) -> void:

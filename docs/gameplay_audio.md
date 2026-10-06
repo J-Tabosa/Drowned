@@ -32,7 +32,7 @@ Composição instrumental original feita para o projeto, sem samples ou músicas
 externas: **72 BPM, ré menor, 16 compassos, loop estéreo de 53,33 segundos**.
 As três camadas começam juntas e permanecem sincronizadas:
 
-- `assets/audio/music/cavern.wav`: acordes suaves, notas espaçadas e ecos nas cavernas, seleção e diálogos.
+- `assets/audio/music/cavern.wav`: acordes suaves, notas espaçadas, ecos e pulsos lentos de baixo nas cavernas, título, seleção e diálogos.
 - `assets/audio/music/waves_drums.wav`: tambores graves entram no início das ondas e permanecem entre elas.
 - `assets/audio/music/boss_guitar.wav`: guitarra de corda pinçada, sintetizada por Karplus–Strong, entra ao acessar a sala do Guardião, junto dos tambores.
 
@@ -40,6 +40,9 @@ As transições duram 1,5 s. Depois das ondas, a revelação retorna ao ambiente
 calmo; ao entrar na sala do chefe, a guitarra entra antes da apresentação.
 Derrota, vitória, saída após o chefe e retorno à seleção restauram a base calma.
 O volume persiste em `user://preferences.cfg`; zero silencia todas as camadas.
+A música continua nos diálogos enquanto o combate está pausado; o menu de
+pausa suspende o áudio. O baixo usa notas fundamentais profundas e harmônicos
+audíveis para acrescentar tensão sem encobrir a melodia.
 
 Para recriar os WAVs: `python tools/compose_soundtrack.py` (requer NumPy).
 Os WAVs e suas configurações de importação estão incluídos no repositório;

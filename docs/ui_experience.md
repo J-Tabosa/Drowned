@@ -11,7 +11,13 @@ O arquivo docs/MELHORIAS.md referenciado pelo gerador de documentos não está n
 - HUD compacta com tamanho físico estável: personagem, vida e habilidade à esquerda; tutorial e chefe na faixa inferior direita; resultado ocupa o centro e oculta a HUD. Missão no topo, exibida por 5 segundos a cada atualização. Depois recolhe, reabrindo ao passar o mouse na aba “Missão” ou clicando para fixar; novo clique recolhe.
 - Viewport de referência 960×540 com expansão para outras proporções. Contêineres fazem quebra de palavras; objetivos, instruções, resultados e falas extensas têm rolagem, sem reduzir a fonte para acomodar texto.
 
-A seleção mantém os três cartões e botões alinhados na tela, com descrições reservando a mesma altura e sem rolagem. A caixa de diálogo mede até 820×150 pixels físicos, com texto extenso acessível por rolagem.
+A seleção mantém os três cartões e botões alinhados na tela, sem rolagem. Em
+6/10/2026, títulos, guias, descrições e faixa superior foram removidos; os cards
+mantêm os retratos grandes, a passiva, o especial e o botão Escolher. A caixa
+de diálogo ocupa 70% da largura e 41% da altura, começando em 56% da tela,
+com texto extenso acessível por rolagem. Os retratos ocupam 78% da altura e o
+personagem central vira para acompanhar o falante. Veja
+[`title_and_dialogue.md`](title_and_dialogue.md) para a abertura e os fades.
 
 ## Leitura
 

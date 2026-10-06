@@ -42,6 +42,17 @@ def bell(note, duration=3.2):
         + 0.16 * np.sin(2 * np.pi * hz(note) * 2.01 * t))
 
 
+def bass(note, duration):
+    # Slow sub-bass pulses with audible overtones add tension under the pads.
+    t = np.arange(round(duration * RATE)) / RATE
+    f = hz(note)
+    envelope = np.minimum(t / 0.12, 1) * np.exp(-t * 0.55)
+    envelope *= np.minimum((duration - t) / 0.28, 1)
+    tone = np.sin(2 * np.pi * f * t) + 0.40 * np.sin(4 * np.pi * f * t)
+    tone += 0.16 * np.sin(6 * np.pi * f * t)
+    return np.tanh(tone * 1.15) * envelope * (0.88 + 0.12 * np.sin(2 * np.pi * 0.7 * t))
+
+
 def drum(frequency, duration, noise=0.08):
     t = np.arange(round(duration * RATE)) / RATE
     phase = 2 * np.pi * frequency * (t + 0.025 * (1 - np.exp(-t * 45)))
@@ -74,6 +85,8 @@ def main():
             add(stems["cavern"], pad(note, 4 * BEAT + 2.2), start - 1.1, 0.105, (voice - 1.5) * 0.32)
         add(stems["cavern"], bell(melody[bar]), start + BEAT, 0.13, (-1 if bar % 2 else 1) * 0.45)
         add(stems["cavern"], bell(melody[bar] - 12), start + 3 * BEAT, 0.07, 0.2)
+        for beat in [0, 2]:
+            add(stems["cavern"], bass(chord[0] - 24, 2 * BEAT + 0.2), start + beat * BEAT, 0.20)
         for beat in range(4):
             add(stems["waves_drums"], drum(62 if beat % 2 == 0 else 104, 0.55), start + beat * BEAT,
                 0.42 if beat == 0 else 0.24, -0.2 if beat % 2 else 0.15)

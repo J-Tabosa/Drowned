@@ -18,16 +18,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.025, 0.082, 0.129, 1)
-mouse_filter = 2
-
-[node name="TopWater" type="ColorRect" parent="."]
-layout_mode = 1
-anchors_preset = 10
-anchor_right = 1.0
-offset_bottom = 8.0
-grow_horizontal = 2
-color = Color(0.25, 0.78, 0.84, 0.8)
+color = Color(0.022, 0.064, 0.092, 1)
 mouse_filter = 2
 
 [node name="Center" type="CenterContainer" parent="."]
@@ -35,52 +26,12 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 40.0
-offset_top = 26.0
-offset_right = -40.0
-offset_bottom = -26.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 
-
-[node name="Content" type="VBoxContainer" parent="Center"]
-layout_mode = 2
-theme_override_constants/separation = 10
-
-[node name="Eyebrow" type="Label" parent="Center/Content"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.25, 0.78, 0.84, 1)
-theme_override_font_sizes/font_size = 16
-text = "DROWNED  •  SOBREVIVENTES"
-horizontal_alignment = 1
-
-[node name="Title" type="Label" parent="Center/Content"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 28
-text = "Escolha seu personagem"
-horizontal_alignment = 1
-
-[node name="Subtitle" type="Label" parent="Center/Content"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.67, 0.76, 0.82, 1)
-theme_override_font_sizes/font_size = 16
-text = "Cada sobrevivente tem seu ataque, uma passiva e uma habilidade especial."
-horizontal_alignment = 1
-
-[node name="Spacer" type="Control" parent="Center/Content"]
-custom_minimum_size = Vector2(0, 4)
-layout_mode = 2
-
-[node name="Cards" type="HBoxContainer" parent="Center/Content"]
+[node name="Cards" type="HBoxContainer" parent="Center"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_constants/separation = 16
+theme_override_constants/separation = 22
 alignment = 1
-
-[node name="Hint" type="Label" parent="Center/Content"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_colors/font_color = Color(0.75, 0.84, 0.88, 1)
-theme_override_font_sizes/font_size = 15
-text = "Selecione um personagem"
-horizontal_alignment = 1

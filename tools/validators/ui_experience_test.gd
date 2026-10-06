@@ -16,6 +16,8 @@ func _settle() -> void:
 		await process_frame
 
 func _run() -> void:
+	if root.get_node("SceneTransition").busy:
+		await root.get_node("SceneTransition").revealed
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(OUTPUT))
 	var state: Node = root.get_node("GameState")
@@ -53,6 +55,8 @@ func _run() -> void:
 		assert(absf(status.size.x * status.scale.x / (root.get_visible_rect().size.x / root.size.x) - minf(280, root.size.x * 0.42)) < 1.0)
 		await _capture("hud_" + str(resolution.x) + "x" + str(resolution.y))
 		scene._set_objective("Investigue os sinais deixados entre os destroços.")
+	# Keep this timeout check independent from the physical mouse position.
+	scene._objective_mouse_position = Vector2(-100, -100)
 	scene._set_objective("Teste do aviso temporário.")
 	assert(scene.get_node("Interface/ObjectivePanel").visible)
 	scene._update_objective_visibility(5.1)

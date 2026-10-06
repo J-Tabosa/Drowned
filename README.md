@@ -4,6 +4,8 @@ Projeto Godot do RPG **Drowned**.
 
 ## Documentação
 
+- [`docs/title_and_dialogue.md`](docs/title_and_dialogue.md): título animado, tempestade, seleção simplificada, fades e caverna dos diálogos.
+
 - [`docs/gameplay_audio.md`](docs/gameplay_audio.md): passivas, habilidades especiais (Q / botão direito), trilha dinâmica e validação da integração com o GitHub.
 
 - [`docs/PROJECT_STRUCTURE.md`](docs/PROJECT_STRUCTURE.md): organização de pastas e convenções.

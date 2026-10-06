@@ -42,12 +42,12 @@ var _typing := false
 var _active := false
 var _transitioning := false
 var _indicator_tween: Tween
-var _portrait_cache: Dictionary = {}
 var _mouths: Dictionary = {}
 var _speaker_slot := ""
 var _mouth_time := 0.0
 var _text_scroll: ScrollContainer
 var _skip_requested := false
+var _cave_background: Control
 
 const MOUTH_SOURCE_POINTS := {
 	"breaker": Vector2(640, 480),
@@ -60,6 +60,10 @@ const MOUTH_SOURCE_POINTS := {
 func _ready() -> void:
 	curtain.visible = false
 	curtain.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_cave_background = preload("res://scenes/world/effects/dialogue_cave_background.tscn").instantiate()
+	curtain.add_child(_cave_background)
+	curtain.move_child(_cave_background, 0)
+	dimmer.color = Color(0.0, 0.015, 0.025, 0.16)
 	dialogue_box.theme = NauticalUI.theme()
 	dialogue_box.add_theme_stylebox_override("panel", NauticalUI.panel_style())
 	var content := dialogue_box.get_node("Content")
@@ -75,6 +79,7 @@ func _ready() -> void:
 	continue_indicator.modulate.a = 0.45
 	continue_indicator.add_theme_font_size_override("font_size", 11)
 	dialogue_accent.hide()
+	top_bar.hide()
 	bottom_bar.hide()
 	for slot_name in ["left", "center", "right"]:
 		var portrait: Control = _get_slot_nodes(slot_name).portrait
@@ -96,14 +101,14 @@ func _ready() -> void:
 
 func _layout_stage() -> void:
 	var screen := get_viewport().get_visible_rect().size
-	var slot_height := screen.y * 0.66
-	var slot_width := minf(screen.x * 0.29, screen.y * 0.62)
-	var slot_top := screen.y * 0.035
-	var side_inset := screen.x * 0.025
+	var slot_height := screen.y * 0.78
+	var slot_width := screen.x * 0.34
+	var slot_top := screen.y * 0.015
+	var side_inset := screen.x * 0.005
 	var positions := {
 		"left": Vector2(side_inset, slot_top),
 		"center": Vector2((screen.x - slot_width) * 0.5, slot_top),
-		"right": Vector2(screen.x - slot_width + side_inset, slot_top),
+		"right": Vector2(screen.x - slot_width - side_inset, slot_top),
 	}
 	for slot_name in ["left", "center", "right"]:
 		var portrait: Control = _get_slot_nodes(slot_name).portrait
@@ -112,15 +117,14 @@ func _layout_stage() -> void:
 		portrait.pivot_offset = portrait.size * 0.5
 		if _actors.has(_slots.get(slot_name, "")):
 			_place_mouth(slot_name, _actors[_slots[slot_name]])
-	var pixel_scale := screen.x / float(get_window().size.x)
-	var box_width := minf(820.0, float(get_window().size.x) * 0.88)
-	var box_height := 150.0
-	speaker_label.add_theme_font_size_override("font_size", 17)
-	dialogue_label.add_theme_font_size_override("font_size", 16)
-	continue_indicator.add_theme_font_size_override("font_size", 11)
+	var box_width := screen.x * 0.70
+	var box_height := screen.y * 0.41
+	speaker_label.add_theme_font_size_override("font_size", 22)
+	dialogue_label.add_theme_font_size_override("font_size", 20)
+	continue_indicator.add_theme_font_size_override("font_size", 12)
 	dialogue_label.custom_minimum_size.y = 0.0
-	dialogue_box.scale = Vector2.ONE * pixel_scale
-	dialogue_box.position = Vector2((screen.x - box_width * pixel_scale) * 0.5, screen.y - (box_height + 18.0) * pixel_scale)
+	dialogue_box.scale = Vector2.ONE
+	dialogue_box.position = Vector2((screen.x - box_width) * 0.5, screen.y * 0.56)
 	dialogue_box.size = Vector2(box_width, box_height)
 	for slot_name in ["left", "center", "right"]:
 		_slot_home_positions[slot_name] = positions[slot_name]
@@ -265,6 +269,8 @@ func _apply_actor_to_slot(slot: String, actor_id: String) -> void:
 	nodes.body.color = actor_color
 	nodes.arm.color = actor_color.darkened(0.12)
 	nodes.texture.texture = portrait_texture
+	if slot != "center":
+		nodes.texture.flip_h = slot == "right"
 	nodes.texture.visible = portrait_texture != null
 	nodes.placeholder.visible = portrait_texture == null
 	nodes.portrait.modulate = Color.WHITE
@@ -275,43 +281,7 @@ func _apply_actor_to_slot(slot: String, actor_id: String) -> void:
 
 ## Aceita uma Texture2D pronta ou um caminho de recurso e usa nulo para o placeholder.
 func _resolve_portrait(portrait_value: Variant) -> Texture2D:
-	if portrait_value is Texture2D:
-		return portrait_value
-	if portrait_value is String and not portrait_value.is_empty() and ResourceLoader.exists(portrait_value):
-		if _portrait_cache.has(portrait_value):
-			return _portrait_cache[portrait_value]
-		var original := load(portrait_value) as Texture2D
-		var image := original.get_image()
-		var bounds := _portrait_visible_region(image)
-		if bounds.has_area():
-			var atlas := AtlasTexture.new()
-			atlas.atlas = original
-			atlas.region = Rect2(bounds)
-			_portrait_cache[portrait_value] = atlas
-			return atlas
-		_portrait_cache[portrait_value] = original
-		return original
-	return null
-
-
-func _portrait_visible_region(image: Image) -> Rect2i:
-	# Generated PNGs contain faint alpha specks outside the silhouette. A small
-	# sampling stride finds the visible figure without treating those as artwork.
-	var min_x := image.get_width()
-	var min_y := image.get_height()
-	var max_x := -1
-	var max_y := -1
-	for y in range(0, image.get_height(), 3):
-		for x in range(0, image.get_width(), 3):
-			if image.get_pixel(x, y).a < 0.45:
-				continue
-			min_x = mini(min_x, x)
-			min_y = mini(min_y, y)
-			max_x = maxi(max_x, x)
-			max_y = maxi(max_y, y)
-	if max_x < min_x:
-		return image.get_used_rect()
-	return Rect2i(min_x, min_y, max_x - min_x + 3, max_y - min_y + 3).grow(16).intersection(Rect2i(Vector2i.ZERO, image.get_size()))
+	return PortraitAssets.resolve(portrait_value)
 
 
 func _place_mouth(slot: String, actor: Dictionary) -> void:
@@ -437,6 +407,10 @@ func _focus_actor(actor_id: String) -> void:
 			active_slot = slot_name
 	_speaker_slot = active_slot
 	_set_speaker_mouth(false)
+	if active_slot in ["left", "right"]:
+		center_texture.flip_h = active_slot == "left"
+		if _actors.has(_slots.get("center", "")):
+			_place_mouth("center", _actors[_slots["center"]])
 	for slot_name in ["left", "center", "right"]:
 		var portrait: Control = _get_slot_nodes(slot_name).portrait
 		if not portrait.visible:
@@ -489,6 +463,7 @@ func _close() -> void:
 	var tween := create_tween().set_parallel(true)
 	tween.set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_IN)
 	tween.tween_property(dimmer, "modulate:a", 0.0, 0.24)
+	tween.tween_property(_cave_background, "modulate:a", 0.0, 0.30)
 	tween.tween_property(top_bar, "position:y", top_bar.position.y - 86.0, 0.28)
 	tween.tween_property(bottom_bar, "position:y", bottom_bar.position.y + 86.0, 0.28)
 	tween.tween_property(dialogue_accent, "position:y", dialogue_accent.position.y + 250.0, 0.28)
