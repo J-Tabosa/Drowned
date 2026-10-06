@@ -103,6 +103,14 @@ offset_right = 330.0
 offset_bottom = 310.0
 text = "Voltar à seleção"
 
+[node name="ReturnTitle" type="Button" parent="Interface/PausePanel/PauseCard"]
+unique_name_in_owner = true
+offset_left = 70.0
+offset_top = 320.0
+offset_right = 330.0
+offset_bottom = 362.0
+text = "Voltar à tela inicial"
+
 [node name="SettingsCard" type="ColorRect" parent="Interface/PausePanel"]
 unique_name_in_owner = true
 visible = false
@@ -478,6 +486,7 @@ text = "Tentar novamente"
 [connection signal="pressed" from="Interface/PausePanel/PauseCard/Restart" to="." method="_on_restart_pressed"]
 [connection signal="pressed" from="Interface/PausePanel/PauseCard/Settings" to="." method="_on_pause_settings_pressed"]
 [connection signal="pressed" from="Interface/PausePanel/PauseCard/ChangeCharacter" to="." method="_on_change_character_pressed"]
+[connection signal="pressed" from="Interface/PausePanel/PauseCard/ReturnTitle" to="." method="_on_return_title_pressed"]
 [connection signal="pressed" from="Interface/PausePanel/SettingsCard/Fullscreen" to="." method="_on_fullscreen_pressed"]
 [connection signal="toggled" from="Interface/PausePanel/SettingsCard/FogToggle" to="." method="_on_fog_toggled"]
 [connection signal="pressed" from="Interface/PausePanel/SettingsCard/CloseSettings" to="." method="_on_pause_settings_close_pressed"]

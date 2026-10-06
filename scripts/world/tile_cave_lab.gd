@@ -656,7 +656,7 @@ func _begin_boss_fight(skip_card := false) -> void:
 			"GUARDIÃO ABISSAL",
 			"(Guardião das Profundezas) — MINICHEFE",
 			"Uma sentinela ancestral da caverna. Seu dash percorre toda a área marcada antes do impacto.",
-			Color("9b58b5")
+			Color("9b58b5"), 2.7, _boss.body.texture
 		)
 	boss_panel.visible = true
 	_boss.set_active(true)
@@ -668,6 +668,8 @@ func _begin_boss_fight(skip_card := false) -> void:
 
 ## Atualiza o dispositivo de entrada, alterna fullscreen/debug e mantém atalhos globais ativos.
 func _input(event: InputEvent) -> void:
+	if SceneTransition.busy:
+		return
 	if event is InputEventMouseMotion:
 		_objective_mouse_position = event.position
 	if DialogueManager.is_playing():
@@ -886,6 +888,17 @@ func _on_change_character_pressed() -> void:
 	get_tree().paused = false
 	MusicDirector.set_context("cavern")
 	get_tree().change_scene_to_file("res://scenes/ui/menus/character_select.tscn")
+
+
+## Encerra a partida e retorna à abertura sem deixar a árvore nem a música pausadas.
+func _on_return_title_pressed() -> void:
+	if SceneTransition.busy:
+		return
+	player.set_controls_enabled(false)
+	pause_panel.hide()
+	get_tree().paused = false
+	MusicDirector.set_context("cavern")
+	SceneTransition.transition_to("res://scenes/ui/menus/title_screen.tscn")
 
 
 func _refresh_skill_status() -> void:

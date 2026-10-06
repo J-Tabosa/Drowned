@@ -20,6 +20,20 @@ O menu desaparece, e um fade de 0,65 segundo leva à seleção de personagens.
 A sequência ignora entradas repetidas. A navegação posterior e os fades
 entre seleção, introdução e partida continuam no autoload `SceneTransition`.
 
+Durante a partida, Esc abre a pausa. Além de retornar à seleção de personagens,
+o botão **Voltar à tela inicial** encerra a partida com fade, restaura a árvore
+sem pausa e retorna ao barco e ao menu de abertura. A trilha ambiente já toca
+na abertura; ao voltar da pausa, ela retoma respeitando o volume salvo.
+
+## Apresentação do Guardião
+
+O cartão mostrado ao entrar na sala usa a mesma sprite sheet do Guardião
+Abissal usada no combate. A primeira linha de seis quadros é animada como
+repouso, com transparência e filtro nearest. Cabeça e corpo provisórios em
+retângulos foram removidos. A sprite mantém a proporção em resoluções distintas,
+junto do nome, classificação e descrição do encontro. O Guardião permanece
+inativo até a apresentação terminar; sua barra de vida e combate seguem intactos.
+
 ## Arte compacta e camadas
 
 As artes foram criadas com o gerador de imagens integrado, usando a referência
@@ -71,6 +85,10 @@ som uma vez, sem duplicação pela indicação de invulnerabilidade.
 
 ## Validação
 
+- `boss_presentation_and_menu_test.gd`: sprite real animada na entrada da sala,
+  início da luta após o cartão, Esc, retorno à abertura com fade e música
+  retomada; capturas do cartão e pausa em 640×360 e 1152×648 quando
+  `DROWNED_FLOW_CAPTURE=1`.
 - `title_flow_test.gd`: menu em 640×360, 960×540, 1280×720 e 1920×1080;
   configurações, créditos, barco sem personagens, balanço, chuva, tempestade,
   seleção, diálogos, gotas e pausa.
