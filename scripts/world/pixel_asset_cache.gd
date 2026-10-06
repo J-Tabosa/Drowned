@@ -1,6 +1,6 @@
 extends RefCounted
 
-## Mantém as imagens geradas em 32 pixels lógicos na renderização do jogo.
+## Mantém os assets do cenário em 64 pixels lógicos (128 no atlas de quatro props).
 ## O PNG de origem permanece intacto; a versão pequena é criada uma vez em memória.
 static var _cache: Dictionary = {}
 
@@ -23,9 +23,9 @@ static func pixel_texture(source: Texture2D, size: Vector2i, opaque_base := Colo
 				continue
 			else:
 				color.a = 1.0
-			color.r = roundf(color.r * 12.0) / 12.0
-			color.g = roundf(color.g * 12.0) / 12.0
-			color.b = roundf(color.b * 12.0) / 12.0
+			color.r = roundf(color.r * 24.0) / 24.0
+			color.g = roundf(color.g * 24.0) / 24.0
+			color.b = roundf(color.b * 24.0) / 24.0
 			image.set_pixel(x, y, color)
 	var texture := ImageTexture.create_from_image(image)
 	_cache[cache_key] = texture

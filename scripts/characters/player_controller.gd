@@ -3,6 +3,9 @@ extends CharacterBody2D
 signal action_used(action_name: String, cooldown: float)
 signal health_changed(current: float, maximum: float)
 signal died
+signal action_ready
+signal action_rejected
+signal invulnerability_changed(active: bool)
 
 const SPRINT_MULTIPLIER := 1.55
 const BASE_VISUAL_SCALE := Vector2.ONE
@@ -27,6 +30,29 @@ var _knockback_velocity := Vector2.ZERO
 var _arena: Node2D
 var _controls_enabled := true
 var _base_collision_mask := 0
+var cooldown_remaining := 0.0
+var _invulnerability_visible := false
+var _damage_tween: Tween
+
+
+func _process(delta: float) -> void:
+	if _dead:
+		return
+	if cooldown_remaining > 0.0:
+		cooldown_remaining = maxf(0.0, cooldown_remaining - delta)
+		if cooldown_remaining == 0.0:
+			_can_act = true
+			action_ready.emit()
+	var protected := not can_receive_damage()
+	if protected != _invulnerability_visible:
+		_invulnerability_visible = protected
+		invulnerability_changed.emit(protected)
+		queue_redraw()
+
+
+func _draw() -> void:
+	if _invulnerability_visible and not _dead:
+		draw_arc(Vector2.ZERO, 36.0, 0.0, TAU, 48, Color("80e5ec"), 3.0, true)
 
 
 ## Recebe o perfil selecionado antes ou depois da entrada do jogador na árvore da cena.
@@ -77,11 +103,16 @@ func _physics_process(delta: float) -> void:
 	var previous_position := global_position
 	move_and_slide()
 	if is_instance_valid(_arena) and not _arena.is_walkable(global_position):
+		var candidate := global_position
 		global_position = previous_position
 		_knockback_velocity = Vector2.ZERO
+		for axis in [Vector2(candidate.x, previous_position.y), Vector2(previous_position.x, candidate.y)]:
+			if _arena.is_walkable(axis):
+				global_position = axis
+				break
 	body.set_locomotion(global_position.distance_squared_to(previous_position) > 1.0, Input.is_action_pressed("sprint"))
 
-	if Input.is_action_just_pressed("primary_action") and _can_act:
+	if Input.is_action_just_pressed("primary_action"):
 		_use_primary_action()
 
 
@@ -151,7 +182,13 @@ func is_sprinting() -> bool:
 
 ## Escolhe a habilidade do perfil, emite cooldown e impede uso repetido até ela recarregar.
 func _use_primary_action() -> void:
+	if _dead or not _controls_enabled:
+		return
+	if not _can_act:
+		action_rejected.emit()
+		return
 	_can_act = false
+	cooldown_remaining = float(profile.cooldown)
 	action_used.emit(profile.action_name, float(profile.cooldown))
 	match profile.action:
 		"melee":
@@ -171,10 +208,6 @@ func _use_primary_action() -> void:
 			_animate_dash()
 		"dive":
 			_animate_dive()
-	get_tree().create_timer(float(profile.cooldown), false).timeout.connect(func() -> void:
-		if not _dead:
-			_can_act = true
-	)
 
 
 ## Ativa o golpe quando a âncora alcança o arco principal da animação.
@@ -357,14 +390,26 @@ func _spawn_trail() -> void:
 ## Pisca o corpo do jogador quando a vida é reduzida.
 func _on_damaged(_amount: float, _source_position: Vector2) -> void:
 	body.play_hurt()
-	var tween := create_tween()
-	tween.tween_property(body, "modulate", Color.WHITE * 2.2, 0.04)
-	tween.tween_property(body, "modulate", Color.WHITE, 0.12)
+	if _damage_tween and _damage_tween.is_valid():
+		_damage_tween.kill()
+	body.self_modulate = Color("ff8d99")
+	body.scale = BASE_VISUAL_SCALE * Vector2(1.06, 0.95)
+	_damage_tween = create_tween().set_parallel(true)
+	_damage_tween.tween_property(body, "self_modulate", Color.WHITE, 0.2)
+	_damage_tween.tween_property(body, "scale", BASE_VISUAL_SCALE, 0.2)
 
 
 ## Interrompe controles, achata o placeholder e comunica a derrota à arena.
 func _on_died() -> void:
 	_dead = true
+	for hitbox in [melee_hitbox, dash_hitbox, dive_hitbox]:
+		hitbox.deactivate()
+	_invulnerability_visible = false
+	queue_redraw()
+	if _damage_tween and _damage_tween.is_valid():
+		_damage_tween.kill()
+	body.self_modulate = Color.WHITE
+	body.scale = BASE_VISUAL_SCALE
 	_can_act = false
 	collision_mask = _base_collision_mask
 	velocity = Vector2.ZERO

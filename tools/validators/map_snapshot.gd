@@ -58,6 +58,17 @@ func _run() -> void:
 	for _frame in 4:
 		await process_frame
 	root.get_texture().get_image().save_png(ProjectSettings.globalize_path("res://.godot/map_exit.png"))
+	detail_camera.global_position = lab.arena._gate_nodes.post_boss[3].global_position + Vector2(0, -80)
+	for _frame in 4:
+		await process_frame
+	root.get_texture().get_image().save_png(ProjectSettings.globalize_path("res://.godot/map_gate_closed.png"))
+	lab.player.global_position = lab.arena.get_item_positions()[0]
+	for _frame in 4:
+		await physics_frame
+	lab.arena.mark_boss_defeated()
+	assert(lab.arena.open_post_boss_gate())
+	await create_timer(0.6).timeout
+	root.get_texture().get_image().save_png(ProjectSettings.globalize_path("res://.godot/map_gate_open.png"))
 	detail_camera.queue_free()
 	var overview_camera := Camera2D.new()
 	lab.add_child(overview_camera)

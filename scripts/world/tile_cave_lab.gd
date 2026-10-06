@@ -1,6 +1,7 @@
 extends Node2D
 
 const DIALOGUE_CATALOG := preload("res://scripts/narrative/dialogue_catalog.gd")
+const FEEDBACK := preload("res://scripts/components/gameplay_feedback.gd")
 
 enum EncounterStage {
 	MOVEMENT_TUTORIAL,
@@ -72,6 +73,11 @@ var _boss_spawned := false
 var _round_finished := false
 var _developer_mode := false
 var _last_input_device := "keyboard"
+var _feedback_label: Label
+var _cooldown_label: Label
+var _feedback_time := 0.0
+var _last_gate := ""
+var _reject_wait := 0.0
 
 
 ## Inicializa jogador e HUD usando exclusivamente marcadores fornecidos pelo blueprint do mapa.
@@ -80,11 +86,13 @@ func _ready() -> void:
 	developer_panel.visible = _developer_mode
 	pause_panel.visible = false
 	settings_card.visible = false
+	_create_feedback_labels()
 	_style_hud()
 	get_viewport().size_changed.connect(_layout_hud)
 	_layout_hud()
 	_spawn_player()
 	arena.item_collected.connect(_on_item_collected)
+	arena.gate_opened.connect(_on_gate_opened)
 	_on_item_collected(0, arena.get_item_positions().size())
 	result_panel.visible = false
 	boss_panel.visible = false
@@ -98,7 +106,95 @@ func _ready() -> void:
 
 
 func _on_item_collected(collected: int, total: int) -> void:
-	relic_label.text = "RELÍQUIAS  %d/%d" % [collected, total]
+	relic_label.text = "CHAVES  %d/%d%s" % [collected, total, " • 1 usada" if arena._exit_key_used else ""]
+	if collected > 0:
+		_notify("Chave-bússola encontrada — abre o portão laranja.", Color("efb46b"), "key")
+		FEEDBACK.burst(self, player.global_position, Color("efb46b"))
+		FEEDBACK.pulse(relic_label, Color("efb46b"))
+		if _stage == EncounterStage.REACH_EXIT and not arena.is_post_boss_gate_open():
+			_set_objective("Leve uma chave-bússola ao portão laranja.")
+
+
+func _create_feedback_labels() -> void:
+	_feedback_label = Label.new()
+	_feedback_label.name = "GameplayFeedback"
+	_feedback_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_feedback_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_feedback_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_feedback_label.add_theme_font_size_override("font_size", 18)
+	_feedback_label.add_theme_color_override("font_shadow_color", Color("081722"))
+	_feedback_label.add_theme_constant_override("shadow_outline_size", 5)
+	_feedback_label.visible = false
+	$Interface.add_child(_feedback_label)
+	_cooldown_label = Label.new()
+	_cooldown_label.name = "CooldownState"
+	_cooldown_label.position = Vector2(18, 96)
+	_cooldown_label.add_theme_font_size_override("font_size", 12)
+	_cooldown_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	$Interface/TopPanel.add_child(_cooldown_label)
+	$Interface/TopPanel.size.y = 122.0
+
+
+func _notify(text: String, tint: Color, cue := "") -> void:
+	_feedback_label.text = text
+	_feedback_label.add_theme_color_override("font_color", tint)
+	_feedback_label.visible = true
+	_feedback_time = 2.6
+	FEEDBACK.pulse(_feedback_label, Color.WHITE)
+	if not cue.is_empty():
+		FEEDBACK.sound(self, cue)
+
+
+func _objective_completed(text: String) -> void:
+	_notify("✓ " + text, Color("83dfbe"), "complete")
+	FEEDBACK.pulse(objective_label, Color("83dfbe"))
+	FEEDBACK.burst(self, player.global_position, Color("83dfbe"))
+
+
+func _on_gate_opened(gate_id: String) -> void:
+	_notify("Portão laranja aberto — chave utilizada." if gate_id == "post_boss" else "Selo rompido — passagem aberta.", Color("efb46b"), "gate")
+	if gate_id == "post_boss":
+		relic_label.text = "CHAVES  %d/%d • 1 usada" % [arena.get_collected_item_count(), arena.get_item_positions().size()]
+		_set_objective("Atravesse o portão aberto e alcance a saída.")
+
+
+func _check_gate_interaction() -> void:
+	if not player._controls_enabled:
+		return
+	var nearby: String = arena.get_nearby_closed_gate(player.global_position)
+	if nearby == "post_boss" and _stage == EncounterStage.REACH_EXIT and arena.has_exit_key():
+		arena.open_post_boss_gate()
+	elif not nearby.is_empty() and nearby != _last_gate:
+		_notify(arena.get_gate_hint(nearby), Color("efb46b"), "blocked")
+	_last_gate = nearby
+
+
+func _on_action_ready() -> void:
+	if _round_finished:
+		return
+	FEEDBACK.pulse(cooldown_bar, Color("83dfbe"))
+	FEEDBACK.sound(self, "ready")
+
+
+func _on_action_rejected() -> void:
+	if _round_finished or _reject_wait > 0.0:
+		return
+	_reject_wait = 0.4
+	FEEDBACK.pulse(cooldown_bar, Color("efb46b"))
+	FEEDBACK.pulse(_cooldown_label, Color("efb46b"))
+	FEEDBACK.sound(self, "blocked")
+
+
+func _on_invulnerability_changed(active: bool) -> void:
+	if active:
+		FEEDBACK.burst(self, player.global_position, Color("80e5ec"))
+		FEEDBACK.sound(self, "protect")
+
+
+func _on_player_damaged(amount: float, source: Vector2) -> void:
+	_notify("−%d VIDA" % ceili(amount), Color("ff8d99"), "damage")
+	FEEDBACK.pulse(health_bar, Color("ff8d99"))
+	FEEDBACK.impact(self, player.global_position, source.direction_to(player.global_position))
 
 
 func _style_hud() -> void:
@@ -142,12 +238,24 @@ func _layout_hud() -> void:
 	cooldown_bar.offset_right = panel_width - 18.0
 	stage_label.offset_right = panel_width - 14.0
 	objective_label.offset_right = panel_width - 14.0
+	_feedback_label.position = Vector2(margin, 156)
+	_feedback_label.size = Vector2(width - margin * 2.0, 56)
 
 
 ## Monitora requisitos e proximidade dos marcadores C e B desenhados no blueprint.
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if get_tree().paused or _round_finished or not is_instance_valid(player):
 		return
+	_feedback_time = maxf(0.0, _feedback_time - delta)
+	_feedback_label.visible = _feedback_time > 0.0
+	_reject_wait = maxf(0.0, _reject_wait - delta)
+	var remaining: float = player.cooldown_remaining
+	cooldown_bar.value = 100.0 * (1.0 - remaining / float(player.profile.cooldown))
+	_cooldown_label.text = "RECARREGANDO  %.1f s" % remaining if remaining > 0.0 else "HABILIDADE PRONTA"
+	if not player.can_receive_damage():
+		_cooldown_label.text = "INVULNERÁVEL • " + _cooldown_label.text
+	_cooldown_label.add_theme_color_override("font_color", Color("80e5ec") if not player.can_receive_damage() else Color("83dfbe") if remaining == 0.0 else Color("bdcbd4"))
+	_check_gate_interaction()
 	if _stage == EncounterStage.MOVEMENT_TUTORIAL:
 		_track_tutorial()
 	elif _stage == EncounterStage.EXPLORE_ECHOES:
@@ -159,7 +267,7 @@ func _process(_delta: float) -> void:
 		if player.global_position.distance_to(arena.get_anchor_position("boss_spawn")) <= BOSS_TRIGGER_RADIUS:
 			_begin_boss_fight()
 	elif _stage == EncounterStage.REACH_EXIT:
-		if player.global_position.distance_to(arena.get_anchor_position("post_boss_exit")) <= EXIT_TRIGGER_RADIUS:
+		if arena.is_post_boss_gate_open() and player.global_position.distance_to(arena.get_anchor_position("post_boss_exit")) <= EXIT_TRIGGER_RADIUS:
 			_finish_round(true)
 
 
@@ -174,6 +282,10 @@ func _spawn_player() -> void:
 	player.action_used.connect(_on_action_used)
 	player.health_changed.connect(_on_player_health_changed)
 	player.died.connect(_on_player_died)
+	player.action_ready.connect(_on_action_ready)
+	player.action_rejected.connect(_on_action_rejected)
+	player.invulnerability_changed.connect(_on_invulnerability_changed)
+	player.health_component.damaged.connect(_on_player_damaged)
 	character_label.text = profile.name
 	character_label.add_theme_color_override("font_color", profile.color)
 	cooldown_bar.value = 100.0
@@ -189,8 +301,12 @@ func _track_tutorial() -> void:
 		_movement_distance = minf(MOVEMENT_DISTANCE_REQUIRED, _movement_distance + frame_distance)
 	if player.is_sprinting() and frame_distance > 0.25:
 		_sprint_time = minf(SPRINT_DISTANCE_REQUIRED, _sprint_time + frame_distance)
-	_movement_done = _movement_distance >= MOVEMENT_DISTANCE_REQUIRED
-	_sprint_done = _sprint_time >= SPRINT_DISTANCE_REQUIRED
+	if not _movement_done and _movement_distance >= MOVEMENT_DISTANCE_REQUIRED:
+		_movement_done = true
+		_objective_completed("Movimento aprendido")
+	if not _sprint_done and _sprint_time >= SPRINT_DISTANCE_REQUIRED:
+		_sprint_done = true
+		_objective_completed("Corrida aprendida")
 	_update_tutorial_panel()
 	_try_complete_tutorial()
 
@@ -202,6 +318,7 @@ func _try_complete_tutorial() -> void:
 	if not _movement_done or not _sprint_done or not _action_done:
 		return
 	_stage = EncounterStage.EXPLORE_ECHOES
+	_objective_completed("Treinamento concluído")
 	tutorial_title.text = "ECOS DA GRUTA"
 	_set_objective("Investigue os sinais deixados entre os destroços.")
 	_update_story_panel()
@@ -236,6 +353,7 @@ func _check_story_echoes() -> void:
 	var discovered_index := _story_echo_index
 	_story_echo_index += 1
 	arena.complete_story_echo(discovered_index)
+	_objective_completed("Eco %d de 3 investigado" % _story_echo_index)
 	_update_story_panel()
 	if not skip_cinematics_for_tests:
 		await DialogueManager.play(DIALOGUE_CATALOG.get_exploration_echo(GameState.selected_character_id, discovered_index))
@@ -292,7 +410,7 @@ func _start_next_combat_wave() -> void:
 	for index in wave_size:
 		var spawn_index := (_combat_spawn_cursor + index) % spawn_positions.size()
 		_spawn_enemy(spawn_positions[spawn_index], {
-			"body_color": Color("7850a3") if (index + _combat_wave) % 2 == 0 else Color("436f9a"),
+			"engaged": true,
 			"max_health": 88.0 + float(_combat_wave) * 14.0 + float(index % 3) * 8.0,
 			"move_speed": 96.0 + float(_combat_wave) * 8.0 + float(index % 2) * 10.0,
 		})
@@ -338,7 +456,7 @@ func _spawn_boss_for_reveal() -> void:
 	_boss = _spawn_enemy(arena.get_anchor_position("boss_spawn"), {
 		"display_name": "Guardião Abissal",
 		"is_miniboss": true,
-		"body_color": Color("9b58b5"),
+		"engaged": true,
 		"body_size": Vector2(104, 128),
 		"max_health": 700.0,
 		"move_speed": 118.0,
@@ -346,6 +464,7 @@ func _spawn_boss_for_reveal() -> void:
 		"aggro_range": 1150.0,
 		"attack_range": 116.0,
 		"attack_cooldown": 0.82,
+		"attack_windup": 0.42,
 		"boss_dash_cooldown": 3.25,
 		"boss_dash_speed": 690.0,
 		"boss_dash_duration": 0.54,
@@ -509,8 +628,7 @@ func _refresh_action_prompt() -> void:
 ## Reinicia a recarga visual e registra o uso da habilidade no tutorial.
 func _on_action_used(_action_name: String, cooldown: float) -> void:
 	cooldown_bar.value = 0.0
-	var tween := create_tween()
-	tween.tween_property(cooldown_bar, "value", 100.0, cooldown)
+	_cooldown_label.text = "RECARREGANDO  %.1f s" % cooldown
 	if _stage == EncounterStage.MOVEMENT_TUTORIAL and not _action_done:
 		_action_done = true
 		_update_tutorial_panel()
@@ -537,16 +655,18 @@ func _on_enemy_defeated() -> void:
 	if _round_finished:
 		return
 	if _stage == EncounterStage.COMBAT and _enemies_alive == 0:
+		_objective_completed("Onda %d de 3 vencida" % (_combat_wave + 1))
 		if _combat_wave + 1 < COMBAT_WAVE_SIZES.size():
 			_queue_next_combat_wave()
 		else:
 			_begin_boss_reveal()
 	elif _stage == EncounterStage.BOSS and _enemies_alive == 0:
-		arena.open_post_boss_gate()
+		arena.mark_boss_defeated()
+		_objective_completed("Guardião derrotado — selo do portão rompido")
 		_stage = EncounterStage.REACH_EXIT
 		boss_panel.visible = false
-		_set_stage_text("PASSAGEM LIBERADA")
-		_set_objective("Atravesse o portão laranja e alcance a saída.")
+		_set_stage_text("SAÍDA DA GRUTA")
+		_set_objective("Leve uma chave-bússola ao portão laranja." if arena.has_exit_key() else "Encontre uma chave-bússola dourada para abrir o portão laranja.")
 
 
 ## Abre o resultado de derrota se a fase ainda estiver ativa.
@@ -578,6 +698,12 @@ func _set_objective(text: String) -> void:
 
 ## Exibe o resultado somente na derrota ou quando o jogador realmente atravessa a saída.
 func _finish_round(victory: bool) -> void:
+	if victory:
+		_objective_completed("Prólogo concluído")
+	_feedback_label.visible = false
+	_feedback_time = 0.0
+	FEEDBACK.pulse(result_title, Color("83dfbe") if victory else Color("ff8d99"))
+	player.set_controls_enabled(false)
 	_round_finished = true
 	_stage = EncounterStage.COMPLETE
 	boss_panel.visible = false

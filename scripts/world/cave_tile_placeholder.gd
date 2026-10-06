@@ -45,8 +45,9 @@ func set_open(is_open: bool) -> void:
 		_collision_shape.set_deferred("disabled", is_open)
 	var tween := create_tween().set_parallel(true)
 	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	tween.tween_property(self, "scale:y", 0.08 if is_open else 1.0, 0.32)
-	tween.tween_property(self, "modulate:a", 0.0 if is_open else 1.0, 0.28)
+	tween.tween_property(top_shape, "scale:y", 0.08 if is_open else 1.0, 0.32)
+	tween.tween_property(top_shape, "modulate:a", 0.25 if is_open else 1.0, 0.28)
+	tween.tween_property(glow_shape, "color:a", 0.24 if is_open else 0.12, 0.28)
 
 
 func _setup_floor(tile_size: Vector2, region: String, cell: Vector2i) -> void:
@@ -60,7 +61,7 @@ func _setup_floor(tile_size: Vector2, region: String, cell: Vector2i) -> void:
 		source = POOL_TEXTURE
 		base_color = Color("123f55")
 	top_shape.polygon = _diamond(half)
-	var logical_size := Vector2i(32, 32) if region == "pool" else Vector2i(16, 16)
+	var logical_size := Vector2i(64, 64)
 	_apply_texture(top_shape, PIXEL_ASSET.pixel_texture(source, logical_size, base_color), cell)
 	top_shape.color = _region_color(region)
 	if region == "pool":
@@ -77,8 +78,8 @@ func _setup_floor(tile_size: Vector2, region: String, cell: Vector2i) -> void:
 func _setup_wall(tile_size: Vector2, cell: Vector2i) -> void:
 	var half := tile_size * 0.5
 	top_shape.polygon = _diamond(half)
-	_apply_texture(top_shape, PIXEL_ASSET.pixel_texture(WALL_TEXTURE, Vector2i(32, 32), Color("142936")), cell)
-	top_shape.color = Color("657984")
+	_apply_texture(top_shape, PIXEL_ASSET.pixel_texture(WALL_TEXTURE, Vector2i(64, 64), Color("142936")), cell)
+	top_shape.color = Color("a4b5bf")
 	side_shape.visible = false
 	accent_shape.visible = false
 	glow_shape.visible = false
@@ -118,15 +119,15 @@ func _setup_prop(kind: String) -> void:
 	glow_shape.visible = false
 	var sprite := Sprite2D.new()
 	sprite.name = kind.to_pascal_case()
-	sprite.texture = PIXEL_ASSET.pixel_texture(PROP_ATLAS, Vector2i(64, 64))
+	sprite.texture = PIXEL_ASSET.pixel_texture(PROP_ATLAS, Vector2i(128, 128))
 	sprite.region_enabled = true
 	var quadrant := Vector2i.ZERO
 	match kind:
 		"rock": quadrant = Vector2i(1, 0)
 		"coral": quadrant = Vector2i(0, 1)
 		"stalagmite": quadrant = Vector2i(1, 1)
-	sprite.region_rect = Rect2(quadrant.x * 32, quadrant.y * 32, 32, 32)
-	sprite.scale = Vector2(3.4, 3.4) if kind != "rock" else Vector2(3.6, 3.6)
+	sprite.region_rect = Rect2(quadrant.x * 64, quadrant.y * 64, 64, 64)
+	sprite.scale = Vector2(1.7, 1.7) if kind != "rock" else Vector2(1.8, 1.8)
 	sprite.position.y = -24.0 if kind == "algae" or kind == "stalagmite" else -7.0
 	add_child(sprite)
 	if kind == "rock":

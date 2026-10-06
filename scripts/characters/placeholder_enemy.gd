@@ -2,14 +2,19 @@ extends CharacterBody2D
 
 signal defeated
 
+const FEEDBACK := preload("res://scripts/components/gameplay_feedback.gd")
+const NORMAL_SHEET := preload("res://assets/sprites/enemies/afogado_sheet_96.png")
+const BOSS_SHEET := preload("res://assets/sprites/enemies/guardiao_abissal_sheet_96.png")
+
 @export var move_speed := 105.0
 @export var attack_damage := 18.0
 @export var max_health := 80.0
-@export var aggro_range := 470.0
+@export var aggro_range := 650.0
 @export var attack_range := 74.0
 @export var attack_cooldown := 0.9
+@export var attack_windup := 0.30
 @export var display_name := "Afogado"
-@export var body_color := Color("8c52ad")
+@export var body_color := Color.WHITE
 @export var body_size := Vector2(42, 58)
 @export var boss_dash_cooldown := 3.4
 @export var boss_dash_speed := 670.0
@@ -17,9 +22,8 @@ signal defeated
 @export var boss_dash_telegraph_time := 0.85
 @export var boss_dash_damage := 38.0
 
-@onready var body: Polygon2D = %Body
+@onready var body: EnemyAnimation = %Body
 @onready var shadow: Polygon2D = $Shadow
-@onready var eye: Polygon2D = $Body/Eye
 @onready var health_component: Node = %HealthComponent
 @onready var attack_hitbox: Area2D = %AttackHitbox
 
@@ -29,271 +33,423 @@ var _can_attack := true
 var _dead := false
 var _enraged := false
 var _active := true
+var _aggro := false
 var _boss_dashing := false
 var _boss_telegraphing := false
 var _boss_dash_timer := 2.2
 var _boss_dash_direction := Vector2.DOWN
 var _dash_telegraph: Polygon2D
+var _melee_telegraph: Polygon2D
 var _knockback_velocity := Vector2.ZERO
 var _arena: Node2D
+var _radius := 20.0
+var _path := PackedVector2Array()
+var _path_timer := 0.0
+var _path_target := Vector2.INF
+var _separation := Vector2.ZERO
+var _separation_timer := 0.0
+var _attack_state := ""
+var _attack_timer := 0.0
+var _attack_direction := Vector2.DOWN
+var _dash_elapsed := 0.0
+var _hurt_timer := 0.0
+var _damage_tween: Tween
 
 
-## Recebe uma variação antes da entrada na árvore, permitindo reutilizar a mesma cena como mini-chefe.
 func setup(config: Dictionary) -> void:
 	display_name = String(config.get("display_name", display_name))
 	is_miniboss = bool(config.get("is_miniboss", is_miniboss))
-	move_speed = float(config.get("move_speed", move_speed))
-	attack_damage = float(config.get("attack_damage", attack_damage))
-	max_health = float(config.get("max_health", max_health))
-	aggro_range = float(config.get("aggro_range", aggro_range))
-	attack_range = float(config.get("attack_range", attack_range))
-	attack_cooldown = float(config.get("attack_cooldown", attack_cooldown))
+	_aggro = bool(config.get("engaged", _aggro))
+	for property in ["move_speed", "attack_damage", "max_health", "aggro_range", "attack_range", "attack_cooldown", "boss_dash_cooldown", "boss_dash_speed", "boss_dash_duration", "boss_dash_telegraph_time", "boss_dash_damage"]:
+		set(property, float(config.get(property, get(property))))
+	attack_windup = float(config.get("attack_windup", 0.42 if is_miniboss else attack_windup))
 	body_color = config.get("body_color", body_color)
 	body_size = config.get("body_size", body_size)
-	boss_dash_cooldown = float(config.get("boss_dash_cooldown", boss_dash_cooldown))
-	boss_dash_speed = float(config.get("boss_dash_speed", boss_dash_speed))
-	boss_dash_duration = float(config.get("boss_dash_duration", boss_dash_duration))
-	boss_dash_telegraph_time = float(config.get("boss_dash_telegraph_time", boss_dash_telegraph_time))
-	boss_dash_damage = float(config.get("boss_dash_damage", boss_dash_damage))
 	if is_node_ready():
 		_apply_variant()
 
 
-## Registra o inimigo, aplica sua variação, conecta sinais e localiza jogador e arena atuais.
 func _ready() -> void:
 	add_to_group("enemies")
+	motion_mode = CharacterBody2D.MOTION_MODE_FLOATING
 	_arena = get_tree().get_first_node_in_group("walkable_area") as Node2D
 	health_component.damaged.connect(_on_damaged)
 	health_component.died.connect(_on_died)
 	_apply_variant()
 	_target = get_tree().get_first_node_in_group("player") as Node2D
+	_path_timer = float(get_instance_id() % 7) * 0.04
 
 
-## Persegue o jogador próximo, respeita o contorno irregular e ataca dentro do alcance.
 func _physics_process(delta: float) -> void:
 	if _dead or not _active:
 		velocity = Vector2.ZERO
+		body.set_locomotion(false)
 		return
 	if not is_instance_valid(_target):
 		_target = get_tree().get_first_node_in_group("player") as Node2D
 		return
-
+	if _target.get("_dead") == true:
+		velocity = Vector2.ZERO
+		body.set_locomotion(false)
+		_cancel_attack()
+		return
 	var offset := _target.global_position - global_position
 	var distance := offset.length()
-	var direction := offset.normalized() if distance > 1.0 else Vector2.ZERO
-	if is_miniboss:
-		_boss_dash_timer -= delta
-		if _boss_dashing:
-			_process_boss_dash_motion()
-			return
-		if _boss_telegraphing:
-			velocity = Vector2.ZERO
-			return
-		if _boss_dash_timer <= 0.0 and distance > attack_range * 1.3 and distance < 980.0:
-			_start_boss_dash(direction)
-			return
-	if distance < aggro_range and distance > attack_range - 10.0:
-		velocity = direction * move_speed + _knockback_velocity
-	else:
-		velocity = _knockback_velocity
-	_knockback_velocity = _knockback_velocity.move_toward(Vector2.ZERO, 720.0 * delta)
-	var previous_position := global_position
-	move_and_slide()
-	if is_instance_valid(_arena) and not _arena.is_walkable(global_position, 24.0):
-		global_position = previous_position
-		_knockback_velocity = Vector2.ZERO
-
-	if distance <= attack_range and _can_attack:
+	var direction := offset.normalized() if distance > 1.0 else Vector2.DOWN
+	_aggro = _aggro or distance <= aggro_range
+	_hurt_timer = maxf(0.0, _hurt_timer - delta)
+	_boss_dash_timer -= delta if _aggro else 0.0
+	if _boss_telegraphing:
+		_dash_elapsed += delta
+		velocity = Vector2.ZERO
+		if _dash_elapsed >= boss_dash_telegraph_time:
+			_begin_boss_dash()
+		return
+	if _boss_dashing:
+		_process_boss_dash_motion(delta)
+		return
+	if _attack_state != "":
+		_process_attack(delta)
+		_move_actor(_knockback_velocity, delta)
+		body.set_locomotion(false)
+		return
+	if _hurt_timer > 0.0:
+		_move_actor(_knockback_velocity, delta)
+		return
+	if _aggro and is_miniboss and _boss_dash_timer <= 0.0 and distance > attack_range * 1.3 and distance < 980.0 and _has_clear_route(_target.global_position):
+		_start_boss_dash(direction)
+		return
+	if _aggro and distance <= attack_range and _can_attack and _has_clear_route(_target.global_position):
 		_attack(direction)
+		return
+	var chase := Vector2.ZERO
+	if _aggro and distance > attack_range * 0.72:
+		chase = _chase_direction(delta) * move_speed
+	_update_separation(delta)
+	var before := global_position
+	_move_actor(chase + _separation + _knockback_velocity, delta)
+	var moved := global_position - before
+	body.set_locomotion(moved.length_squared() > 0.05, _enraged)
+	if absf(moved.x) > 0.05:
+		body.flip_h = moved.x < 0.0
 
 
-## Ajusta aparência, colisões, alcance e vida conforme a configuração recebida.
 func _apply_variant() -> void:
-	body.color = body_color
-	var half_size := body_size * 0.5
-	body.polygon = PackedVector2Array([
-		Vector2(-half_size.x, -half_size.y), Vector2(half_size.x, -half_size.y),
-		Vector2(half_size.x, half_size.y), Vector2(-half_size.x, half_size.y),
-	])
-	shadow.position.y = half_size.y + 4.0
-	shadow.polygon = PackedVector2Array([
-		Vector2(-half_size.x * 1.15, -8), Vector2(half_size.x * 1.15, -8),
-		Vector2(half_size.x * 1.15, 8), Vector2(-half_size.x * 1.15, 8),
-	])
-	eye.position.y = -half_size.y * 0.28
-	eye.scale = Vector2.ONE * (1.8 if is_miniboss else 1.0)
-
-	var body_shape := $CollisionShape2D.shape.duplicate() as RectangleShape2D
-	body_shape.size = body_size
-	$CollisionShape2D.shape = body_shape
-	var hurtbox_shape := $Hurtbox/CollisionShape2D.shape.duplicate() as RectangleShape2D
+	body.configure(BOSS_SHEET if is_miniboss else NORMAL_SHEET)
+	body.scale = Vector2.ONE * (1.5 if is_miniboss else 1.0)
+	body.position = Vector2(0, -8 if is_miniboss else -6)
+	body.modulate = Color.WHITE
+	_radius = 38.0 if is_miniboss else 20.0
+	var shape := CircleShape2D.new()
+	shape.radius = _radius
+	$CollisionShape2D.shape = shape
+	var hurtbox_shape := RectangleShape2D.new()
 	hurtbox_shape.size = body_size * 0.94
 	$Hurtbox/CollisionShape2D.shape = hurtbox_shape
-	var attack_shape := $AttackHitbox/CollisionShape2D.shape.duplicate() as RectangleShape2D
-	attack_shape.size = Vector2(maxf(58.0, body_size.x * 1.35), maxf(44.0, body_size.y * 0.78))
+	var attack_shape := RectangleShape2D.new()
+	attack_shape.size = Vector2(74, 72) if is_miniboss else Vector2(50, 44)
 	$AttackHitbox/CollisionShape2D.shape = attack_shape
+	shadow.position.y = 43.0 if is_miniboss else 30.0
+	shadow.scale = Vector2(1.6, 1.3) if is_miniboss else Vector2.ONE
 	health_component.configure(max_health)
 	attack_hitbox.damage = attack_damage
 	attack_hitbox.knockback_force = 390.0 if is_miniboss else 250.0
+	# Mobs usam separação suave; colisões físicas ficam com jogador, chefe e mundo.
 	collision_layer = 16 if is_miniboss else 2
+	collision_mask = 17
 	z_index = 3 if is_miniboss else 1
 
 
-## Informa à Hurtbox se o inimigo ainda pode ser atingido.
+## Mantém o alvo além do raio inicial e recalcula a rota pelos corredores.
+func _chase_direction(delta: float) -> Vector2:
+	_path_timer -= delta
+	if _has_clear_route(_target.global_position):
+		_path.clear()
+		return global_position.direction_to(_target.global_position)
+	if _path_timer <= 0.0 or _path_target.distance_squared_to(_target.global_position) > 128.0 * 128.0:
+		_path_timer = 0.45
+		_path_target = _target.global_position
+		if is_instance_valid(_arena) and _arena.has_method("get_enemy_path"):
+			_path = _arena.get_enemy_path(global_position, _path_target, _radius)
+	while not _path.is_empty() and global_position.distance_squared_to(_path[0]) < 18.0 * 18.0:
+		_path.remove_at(0)
+	if _path.is_empty():
+		return Vector2.ZERO
+	while _path.size() > 1 and _has_clear_route(_path[1]):
+		_path.remove_at(0)
+	return global_position.direction_to(_path[0])
+
+
+func _has_clear_route(target: Vector2) -> bool:
+	if not is_instance_valid(_arena):
+		return true
+	return _arena.get_farthest_walkable_position(global_position, target, _radius).distance_squared_to(target) < 1.0
+
+
+func _update_separation(delta: float) -> void:
+	_separation_timer -= delta
+	if _separation_timer > 0.0:
+		return
+	_separation_timer = 0.1
+	_separation = Vector2.ZERO
+	for enemy in get_tree().get_nodes_in_group("enemies"):
+		if enemy == self or enemy.get("_dead") == true or not enemy.get("_active"):
+			continue
+		var offset: Vector2 = global_position - enemy.global_position
+		var limit: float = _radius + enemy._radius + 14.0
+		if offset.length_squared() >= limit * limit:
+			continue
+		if offset.length_squared() < 25.0:
+			# Saída lateral determinística evita dois mobs sobrepostos seguirem
+			# com a mesma velocidade antes de conseguirem se separar.
+			var lateral := global_position.direction_to(_target.global_position).orthogonal()
+			if lateral.length_squared() < 0.01:
+				lateral = Vector2.UP
+			offset = lateral if get_instance_id() > enemy.get_instance_id() else -lateral
+		_separation += offset.normalized() * (1.0 - minf(offset.length() / limit, 1.0)) * move_speed
+	_separation = _separation.limit_length(move_speed * 0.7)
+
+
+func _move_actor(desired: Vector2, delta: float) -> void:
+	velocity = desired
+	_knockback_velocity = _knockback_velocity.move_toward(Vector2.ZERO, 720.0 * delta)
+	var previous := global_position
+	move_and_slide()
+	if is_instance_valid(_arena) and not _arena.is_walkable(global_position, _radius):
+		var candidate := global_position
+		global_position = previous
+		# Desliza em um eixo nas quinas, preservando a margem do ator.
+		for axis in [Vector2(candidate.x, previous.y), Vector2(previous.x, candidate.y)]:
+			if _arena.is_walkable(axis, _radius):
+				global_position = axis
+				break
+
+
 func can_receive_damage() -> bool:
 	return not _dead and _active
 
 
-## Identifica a categoria física usada pelo dash do Mergulhador.
 func is_small_enemy() -> bool:
 	return not is_miniboss
 
 
-## Ativa ou adormece o inimigo; o Guardião usa isso durante a revelação da câmera.
 func set_active(active: bool) -> void:
 	_active = active and not _dead
 	velocity = Vector2.ZERO
-	body.modulate = Color.WHITE if _active else Color(0.38, 0.42, 0.52, 0.72)
+	body.modulate = Color.WHITE if _active else Color(0.5, 0.6, 0.65, 0.8)
+	if not _active:
+		_cancel_attack()
+		body.set_locomotion(false)
 	if _active and is_miniboss:
+		_aggro = true
 		_boss_dash_timer = 1.6
 
 
-## Converte a origem do golpe em impulso para afastar o inimigo.
 func receive_knockback(source_position: Vector2, force: float) -> void:
+	if _dead:
+		return
 	var direction := global_position - source_position
 	if direction.length_squared() < 1.0:
 		direction = Vector2.DOWN
-	_knockback_velocity = direction.normalized() * force
+	_knockback_velocity = direction.normalized() * force * (0.3 if is_miniboss else 1.0)
 
 
-## Posiciona a Hitbox na direção do jogador, anima o corpo e inicia o intervalo do ataque.
+## Direção travada na antecipação: o jogador pode sair antes do acerto.
 func _attack(direction: Vector2) -> void:
 	_can_attack = false
-	attack_hitbox.position = direction * (body_size.x * 0.65)
-	attack_hitbox.rotation = direction.angle()
-	attack_hitbox.activate(0.12)
-	var tween := create_tween()
-	tween.tween_property(body, "scale", Vector2(1.35, 0.75), 0.08 if not is_miniboss else 0.13)
-	tween.tween_property(body, "scale", Vector2.ONE, 0.12)
-	get_tree().create_timer(attack_cooldown).timeout.connect(func() -> void:
-		if not _dead:
+	_attack_direction = direction.normalized()
+	_attack_state = "windup"
+	_attack_timer = attack_windup
+	velocity = Vector2.ZERO
+	if absf(direction.x) > 0.08:
+		body.flip_h = direction.x < 0.0
+	body.play_attack(attack_windup * 2.0)
+	_melee_telegraph = Polygon2D.new()
+	_melee_telegraph.polygon = PackedVector2Array([Vector2(18, -22), Vector2(attack_range + 15, -30), Vector2(attack_range + 15, 30), Vector2(18, 22)])
+	_melee_telegraph.color = Color(1.0, 0.45, 0.33, 0.24)
+	_melee_telegraph.rotation = direction.angle()
+	_melee_telegraph.z_index = -1
+	add_child(_melee_telegraph)
+
+
+func _process_attack(delta: float) -> void:
+	_attack_timer -= delta
+	if _attack_timer > 0.0:
+		return
+	match _attack_state:
+		"windup":
+			_clear_melee_telegraph()
+			_attack_state = "strike"
+			_attack_timer = 0.12
+			attack_hitbox.position = _attack_direction * (66.0 if is_miniboss else 43.0)
+			attack_hitbox.rotation = _attack_direction.angle()
+			attack_hitbox.damage = attack_damage
+			attack_hitbox.activate(0.12)
+			FEEDBACK.sound(self, "heavy_swing" if is_miniboss else "swish")
+		"strike":
+			attack_hitbox.deactivate()
+			_attack_state = "recovery"
+			_attack_timer = attack_cooldown
+		"recovery":
+			_attack_state = ""
 			_can_attack = true
-	)
 
 
-## Exibe uma faixa de perigo, espera o jogador reagir e então inicia o dash do mini-chefe.
 func _start_boss_dash(direction: Vector2) -> void:
-	if _boss_telegraphing or _boss_dashing or _dead or not _active:
+	if _boss_telegraphing or _boss_dashing or _dead or not _active or _attack_state != "":
 		return
 	_boss_telegraphing = true
-	_boss_dash_direction = direction if direction.length_squared() > 0.01 else Vector2.DOWN
+	_dash_elapsed = 0.0
+	_boss_dash_direction = direction.normalized() if direction.length_squared() > 0.01 else Vector2.DOWN
+	if absf(direction.x) > 0.08:
+		body.flip_h = direction.x < 0.0
+	body.play_attack(boss_dash_telegraph_time * 2.0)
 	_show_dash_telegraph(_boss_dash_direction)
-	await get_tree().create_timer(boss_dash_telegraph_time).timeout
+	FEEDBACK.sound(self, "boss_warning")
+
+
+func _begin_boss_dash() -> void:
 	_clear_dash_telegraph()
-	if _dead or not _active:
-		_boss_telegraphing = false
-		return
 	_boss_telegraphing = false
 	_boss_dashing = true
+	_dash_elapsed = 0.0
+	body.cancel_attack()
+	body.set_locomotion(true, true)
 	attack_hitbox.position = Vector2.ZERO
+	attack_hitbox.rotation = 0.0
 	attack_hitbox.damage = boss_dash_damage
 	attack_hitbox.knockback_force = 520.0
 	attack_hitbox.activate(boss_dash_duration)
-	var stretch_tween := create_tween().set_parallel(true)
-	stretch_tween.tween_property(body, "scale", Vector2(0.68, 1.62), 0.1)
-	stretch_tween.tween_property(body, "modulate", Color(1.8, 1.35, 2.0, 1.0), 0.1)
-	await get_tree().create_timer(boss_dash_duration).timeout
+	FEEDBACK.sound(self, "heavy_swing")
+
+
+func _process_boss_dash_motion(delta: float) -> void:
+	_dash_elapsed += delta
+	var previous := global_position
+	velocity = _boss_dash_direction * boss_dash_speed
+	move_and_slide()
+	var hit_wall := false
+	if is_instance_valid(_arena):
+		var safe: Vector2 = _arena.get_farthest_walkable_position(previous, global_position, _radius)
+		hit_wall = safe.distance_squared_to(global_position) > 1.0
+		global_position = safe
+	if global_position.distance_squared_to(previous) < pow(boss_dash_speed * delta * 0.3, 2):
+		hit_wall = true
+	if hit_wall or _dash_elapsed >= boss_dash_duration:
+		_finish_boss_dash(hit_wall)
+
+
+func _finish_boss_dash(hit_wall: bool) -> void:
 	_boss_dashing = false
+	_boss_dash_timer = boss_dash_cooldown
+	attack_hitbox.deactivate()
 	attack_hitbox.damage = attack_damage
 	attack_hitbox.knockback_force = 390.0
-	body.scale = Vector2.ONE
-	body.modulate = Color.WHITE
-	_boss_dash_timer = boss_dash_cooldown
+	velocity = Vector2.ZERO
+	body.set_locomotion(false)
+	_attack_state = "recovery"
+	_attack_timer = 0.72 if hit_wall else 0.50
+	_can_attack = false
+	if hit_wall:
+		FEEDBACK.impact(get_parent(), global_position, -_boss_dash_direction, true)
+		FEEDBACK.sound(self, "heavy_hit")
 
 
-## Move o Guardião durante o dash e interrompe a investida ao alcançar uma parede do mapa.
-func _process_boss_dash_motion() -> void:
-	velocity = _boss_dash_direction * boss_dash_speed
-	var previous_position := global_position
-	move_and_slide()
-	if is_instance_valid(_arena) and not _arena.is_walkable(global_position, 58.0):
-		global_position = previous_position
-		velocity = Vector2.ZERO
-		_boss_dashing = false
-		_boss_dash_timer = boss_dash_cooldown
-
-
-## Cria no mundo o retângulo translúcido que antecipa direção, largura e alcance da investida.
 func _show_dash_telegraph(direction: Vector2) -> void:
 	_clear_dash_telegraph()
-	var dash_distance := boss_dash_speed * boss_dash_duration
-	var half_width := body_size.x * 0.72
+	var distance := boss_dash_speed * boss_dash_duration
+	if is_instance_valid(_arena):
+		distance = global_position.distance_to(_arena.get_farthest_walkable_position(global_position, global_position + direction * distance, _radius))
+	var half_width := _radius + 8.0
 	_dash_telegraph = Polygon2D.new()
-	_dash_telegraph.polygon = PackedVector2Array([
-		Vector2(0, -half_width), Vector2(dash_distance, -half_width),
-		Vector2(dash_distance, half_width), Vector2(0, half_width),
-	])
-	_dash_telegraph.color = Color(0.87, 0.22, 0.52, 0.30)
+	_dash_telegraph.polygon = PackedVector2Array([Vector2(0, -half_width), Vector2(distance, -half_width), Vector2(distance, half_width), Vector2(0, half_width)])
+	_dash_telegraph.color = Color(0.95, 0.28, 0.30, 0.28)
+	get_parent().add_child(_dash_telegraph)
 	_dash_telegraph.global_position = global_position
 	_dash_telegraph.rotation = direction.angle()
-	_dash_telegraph.z_index = 2
-	get_parent().add_child(_dash_telegraph)
+	_dash_telegraph.z_index = 0
 	var outline := Line2D.new()
-	outline.points = PackedVector2Array([
-		Vector2(0, -half_width), Vector2(dash_distance, -half_width),
-		Vector2(dash_distance, half_width), Vector2(0, half_width),
-		Vector2(0, -half_width),
-	])
-	outline.width = 5.0
-	outline.default_color = Color(1.0, 0.35, 0.55, 0.82)
+	outline.points = PackedVector2Array([Vector2(0, -half_width), Vector2(distance, -half_width), Vector2(distance, half_width), Vector2(0, half_width), Vector2(0, -half_width)])
+	outline.width = 3.0
+	outline.default_color = Color(1.0, 0.48, 0.32, 0.9)
 	_dash_telegraph.add_child(outline)
-	var warning_tween := _dash_telegraph.create_tween().set_loops()
-	warning_tween.tween_property(_dash_telegraph, "modulate:a", 0.35, 0.13)
-	warning_tween.tween_property(_dash_telegraph, "modulate:a", 1.0, 0.13)
+	var warning := _dash_telegraph.create_tween().set_loops()
+	warning.tween_property(_dash_telegraph, "modulate:a", 0.5, 0.18)
+	warning.tween_property(_dash_telegraph, "modulate:a", 1.0, 0.18)
 
 
-## Remove a previsão do dash sem deixar nós temporários na cena.
 func _clear_dash_telegraph() -> void:
 	if is_instance_valid(_dash_telegraph):
 		_dash_telegraph.queue_free()
 	_dash_telegraph = null
 
 
-## Pisca o retângulo para comunicar que o dano foi recebido.
-func _on_damaged(_amount: float, _source_position: Vector2) -> void:
-	var tween := create_tween()
-	tween.tween_property(body, "modulate", Color.WHITE * 2.2, 0.04)
-	tween.tween_property(body, "modulate", Color.WHITE, 0.12)
-	if is_miniboss and not _enraged and health_component.current_health <= health_component.max_health * 0.5:
+func _clear_melee_telegraph() -> void:
+	if is_instance_valid(_melee_telegraph):
+		_melee_telegraph.queue_free()
+	_melee_telegraph = null
+
+
+func _cancel_attack() -> void:
+	body.cancel_attack()
+	_clear_melee_telegraph()
+	_clear_dash_telegraph()
+	attack_hitbox.deactivate()
+	_attack_state = ""
+	_boss_dashing = false
+	_boss_telegraphing = false
+	_can_attack = true
+	attack_hitbox.damage = attack_damage
+	attack_hitbox.knockback_force = 390.0 if is_miniboss else 250.0
+
+
+func _on_damaged(_amount: float, source: Vector2) -> void:
+	_aggro = true
+	_path_timer = 0.0
+	if _damage_tween and _damage_tween.is_valid():
+		_damage_tween.kill()
+	body.self_modulate = Color("ff626c")
+	_damage_tween = create_tween()
+	_damage_tween.tween_property(body, "self_modulate", Color.WHITE, 0.22)
+	if not is_miniboss:
+		_cancel_attack()
+		_hurt_timer = 0.18
+		body.play_hurt()
+	elif not _boss_dashing and not _boss_telegraphing and _attack_state == "":
+		body.play_hurt()
+	FEEDBACK.impact(get_parent(), global_position + Vector2(0, -8), source.direction_to(global_position), is_miniboss)
+	FEEDBACK.sound(self, "heavy_hit" if is_miniboss else "hit")
+	if is_miniboss and not _enraged and health_component.current_health > 0.0 and health_component.current_health <= health_component.max_health * 0.5:
 		_enter_enraged_phase()
 
 
-## Acelera o Guardião na metade da vida e usa a troca de cor como aviso de segunda fase.
 func _enter_enraged_phase() -> void:
 	_enraged = true
 	move_speed *= 1.28
 	attack_damage *= 1.22
 	attack_cooldown *= 0.72
-	attack_hitbox.damage = attack_damage
-	body.color = Color("e75480")
-	var tween := create_tween()
-	for _pulse in 3:
-		tween.tween_property(body, "scale", Vector2(1.18, 1.18), 0.08)
-		tween.tween_property(body, "scale", Vector2.ONE, 0.08)
+	boss_dash_cooldown *= 0.82
+	body.modulate = Color("c2edf0")
+	FEEDBACK.burst(get_parent(), global_position, Color("83ded7"))
+	FEEDBACK.sound(self, "boss_warning")
 
 
-## Desativa colisões, toca a animação placeholder e avisa a arena antes de se remover.
+## Remove dano e colisão imediatamente; a animação termina antes da liberação do nó.
 func _on_died() -> void:
+	if _dead:
+		return
 	_dead = true
 	_active = false
-	_boss_dashing = false
-	_boss_telegraphing = false
-	_clear_dash_telegraph()
+	velocity = Vector2.ZERO
+	_cancel_attack()
+	remove_from_group("enemies")
 	$CollisionShape2D.set_deferred("disabled", true)
 	$Hurtbox/CollisionShape2D.set_deferred("disabled", true)
-	var tween := create_tween().set_parallel(true)
-	tween.tween_property(body, "scale", Vector2(1.7, 0.12), 0.35 if is_miniboss else 0.2)
-	tween.tween_property(body, "modulate:a", 0.0, 0.35 if is_miniboss else 0.2)
+	var duration := 0.90 if is_miniboss else 0.65
+	body.play_death(duration)
+	FEEDBACK.sound(self, "heavy_death" if is_miniboss else "death")
 	defeated.emit()
-	await tween.finished
-	queue_free()
+	var tween := create_tween()
+	tween.tween_interval(duration + 0.35)
+	tween.tween_property(self, "modulate:a", 0.0, 0.45)
+	tween.tween_callback(queue_free)

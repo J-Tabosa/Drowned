@@ -11,6 +11,8 @@ const MAP_ORIGIN := Vector2(256, 192)
 const ITEM_SCENE := preload("res://scenes/world/items/cave_collectible.tscn")
 const PIXEL_ASSET := preload("res://scripts/world/pixel_asset_cache.gd")
 const EXIT_GATE_TEXTURE := preload("res://assets/sprites/world/orange_iron_gate_pixel.png")
+const FEEDBACK := preload("res://scripts/components/gameplay_feedback.gd")
+const ENEMY_NAVIGATION := preload("res://scripts/world/enemy_navigation.gd")
 
 @export var floor_tile_scene: PackedScene = preload("res://scenes/world/tiles/cave_floor_tile.tscn")
 @export var wall_tile_scene: PackedScene = preload("res://scenes/world/tiles/cave_wall_tile.tscn")
@@ -35,6 +37,9 @@ var _story_echo_nodes: Array[Polygon2D] = []
 var _item_anchors: Array[Vector2] = []
 var _items_collected := 0
 var _exit_gate_art: Sprite2D
+var _exit_gate_right: Sprite2D
+var _boss_defeated := false
+var _exit_key_used := false
 var _light_texture: Texture2D
 var _gate_nodes: Dictionary = {
 	"tutorial": [],
@@ -49,8 +54,10 @@ var _gate_open := {
 var _world_rect := Rect2()
 var _max_columns := 0
 var _map_rows: Array = []
+var _enemy_navigation := ENEMY_NAVIGATION.new()
 
 signal item_collected(collected: int, total: int)
+signal gate_opened(gate_id: String)
 
 
 ## Constrói o mapa inteiro como nós editáveis a partir do blueprint e registra seus marcadores.
@@ -151,6 +158,80 @@ func _build_boundary_walls() -> void:
 			"region": "wall",
 			"cell": cell_value,
 		})
+	_build_wall_contours()
+
+
+## Traça o perímetro da grade escalonada e elimina degraus menores que 52 px.
+## Os tiles mantêm as colisões; somente a silhueta visual é contínua.
+func _build_wall_contours() -> void:
+	var seams := Node2D.new()
+	seams.name = "ContinuousWallFaces"
+	seams.z_index = -1
+	add_child(seams)
+	for tile in wall_tiles.get_children():
+		tile.top_shape.visible = false
+	var edges: Dictionary = {}
+	# Célula de Voronoi da grade: lados compartilhados têm coordenadas idênticas.
+	var corners := PackedVector2Array([Vector2(0, -50), Vector2(48, -14), Vector2(48, 14), Vector2(0, 50), Vector2(-48, 14), Vector2(-48, -14)])
+	for cell_value in _floor_cells:
+		var cell: Vector2i = cell_value
+		var right_offset := 0 if cell.y % 2 == 0 else 1
+		var adjacent := [cell + Vector2i(right_offset, -1), cell + Vector2i(1, 0), cell + Vector2i(right_offset, 1), cell + Vector2i(right_offset - 1, 1), cell + Vector2i(-1, 0), cell + Vector2i(right_offset - 1, -1)]
+		for index in 6:
+			if _floor_cells.has(adjacent[index]):
+				continue
+			edges[_cell_to_local(cell) + corners[index]] = _cell_to_local(cell) + corners[(index + 1) % 6]
+	while not edges.is_empty():
+		var first: Vector2 = edges.keys()[0]
+		var cursor := first
+		var contour := PackedVector2Array([first])
+		while edges.has(cursor):
+			var next: Vector2 = edges[cursor]
+			edges.erase(cursor)
+			contour.append(next)
+			cursor = next
+			if cursor == first:
+				break
+		if contour.size() < 4:
+			continue
+		var middle := contour.size() / 2
+		var outline := _simplify_wall(contour.slice(0, middle + 1))
+		outline.append_array(_simplify_wall(contour.slice(middle)).slice(1))
+		if outline.size() < 4:
+			outline = contour
+		for layer in 3:
+			var line := Line2D.new()
+			line.points = outline
+			line.closed = true
+			line.joint_mode = Line2D.LINE_JOINT_ROUND
+			line.width = [76.0, 60.0, 3.0][layer]
+			line.default_color = [Color("101f2a"), Color("a4b5bf"), Color("6a8a97")][layer]
+			if layer == 1:
+				line.texture = wall_tiles.get_child(0).top_shape.texture
+				line.texture_mode = Line2D.LINE_TEXTURE_TILE
+				line.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+				line.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			if layer == 2:
+				line.position.y = -20.0
+			seams.add_child(line)
+
+
+func _simplify_wall(points: PackedVector2Array) -> PackedVector2Array:
+	if points.size() <= 2:
+		return points
+	var furthest := 0
+	var distance := 52.0
+	for index in range(1, points.size() - 1):
+		var closest := Geometry2D.get_closest_point_to_segment(points[index], points[0], points[-1])
+		var deviation := points[index].distance_to(closest)
+		if deviation > distance:
+			distance = deviation
+			furthest = index
+	if furthest == 0:
+		return PackedVector2Array([points[0], points[-1]])
+	var simplified := _simplify_wall(points.slice(0, furthest + 1))
+	simplified.append_array(_simplify_wall(points.slice(furthest)).slice(1))
+	return simplified
 
 
 ## Centraliza a instanciação para permitir substituir qualquer cena de tile pelo Inspector.
@@ -194,12 +275,19 @@ func _build_exit_gate_art() -> void:
 	center /= float(gate_cells.size())
 	_exit_gate_art = Sprite2D.new()
 	_exit_gate_art.name = "OrangeIronGate"
-	_exit_gate_art.texture = PIXEL_ASSET.pixel_texture(EXIT_GATE_TEXTURE, Vector2i(96, 64))
+	_exit_gate_art.texture = PIXEL_ASSET.pixel_texture(EXIT_GATE_TEXTURE, Vector2i(64, 64))
 	_exit_gate_art.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	_exit_gate_art.position = center + Vector2(0, -77)
-	_exit_gate_art.scale = Vector2(6.4, 4.8)
+	_exit_gate_art.region_enabled = true
+	_exit_gate_art.region_rect = Rect2(0, 0, 32, 64)
+	_exit_gate_art.position = center + Vector2(-153.6, -77)
+	_exit_gate_art.scale = Vector2(9.6, 4.8)
 	_exit_gate_art.z_index = 5
 	gate_tiles.add_child(_exit_gate_art)
+	_exit_gate_right = _exit_gate_art.duplicate() as Sprite2D
+	_exit_gate_right.name = "OrangeIronGateRight"
+	_exit_gate_right.region_rect = Rect2(32, 0, 32, 64)
+	_exit_gate_right.position = center + Vector2(153.6, -77)
+	gate_tiles.add_child(_exit_gate_right)
 	_spawn_light(Vector2i(105, 34), Color("ec853e"), 0.75)
 
 
@@ -343,6 +431,11 @@ func get_world_rect() -> Rect2:
 	return Rect2(global_position + _world_rect.position, _world_rect.size)
 
 
+## Reutiliza caminhos pelo chão aberto; rochas, água e portões fechados bloqueiam a rota.
+func get_enemy_path(from: Vector2, target: Vector2, radius: float) -> PackedVector2Array:
+	return _enemy_navigation.get_path(self, from, target, radius)
+
+
 ## Devolve um marcador global pelo nome; não há coordenadas duplicadas no diretor da fase.
 func get_anchor_position(anchor_name: String) -> Vector2:
 	return to_global(_anchors.get(anchor_name, Vector2.ZERO))
@@ -418,9 +511,44 @@ func open_boss_gate() -> void:
 	_set_gate_open("boss", true)
 
 
-## Libera o portão laranja abaixo do mini-chefe após a vitória.
-func open_post_boss_gate() -> void:
+## A derrota remove o selo; a fechadura continua exigindo uma chave do cenário.
+func mark_boss_defeated() -> void:
+	_boss_defeated = true
+
+
+func has_exit_key() -> bool:
+	return _items_collected > 0 and not _exit_key_used
+
+
+func open_post_boss_gate() -> bool:
+	if is_post_boss_gate_open():
+		return false
+	if not _boss_defeated or not has_exit_key():
+		return false
+	_exit_key_used = true
 	_set_gate_open("post_boss", true)
+	return true
+
+
+func get_nearby_closed_gate(world_position: Vector2) -> String:
+	for gate_id in _gate_nodes:
+		if _gate_open[gate_id]:
+			continue
+		for gate in _gate_nodes[gate_id]:
+			if gate.global_position.distance_to(world_position) <= 155.0:
+				return gate_id
+	return ""
+
+
+func get_gate_hint(gate_id: String) -> String:
+	match gate_id:
+		"tutorial": return "Portão selado: conclua o treino e investigue os três ecos."
+		"boss": return "Portão selado: derrote as três ondas de Afogados."
+		"post_boss":
+			if not _boss_defeated:
+				return "Portão laranja selado: derrote o Guardião e traga uma chave-bússola."
+			return "Portão trancado: encontre uma chave-bússola dourada na gruta."
+	return ""
 
 
 ## Informa estados de portões para HUD e testes.
@@ -441,13 +569,21 @@ func _set_gate_open(gate_id: String, is_open: bool) -> void:
 	if bool(_gate_open.get(gate_id, false)) == is_open:
 		return
 	_gate_open[gate_id] = is_open
+	_enemy_navigation.clear()
 	for gate_node in _gate_nodes.get(gate_id, []):
 		if is_instance_valid(gate_node) and gate_node.has_method("set_open"):
 			gate_node.set_open(is_open)
 	if gate_id == "post_boss" and is_instance_valid(_exit_gate_art):
 		var gate_tween := create_tween().set_parallel(true)
-		gate_tween.tween_property(_exit_gate_art, "modulate:a", 0.0 if is_open else 1.0, 0.4)
-		gate_tween.tween_property(_exit_gate_art, "scale:y", 0.04 if is_open else 4.8, 0.4)
+		gate_tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		gate_tween.tween_property(_exit_gate_art, "position:x", _exit_gate_art.position.x - 145.0, 0.5)
+		gate_tween.tween_property(_exit_gate_right, "position:x", _exit_gate_right.position.x + 145.0, 0.5)
+		gate_tween.tween_property(_exit_gate_art, "scale:x", 2.0, 0.5)
+		gate_tween.tween_property(_exit_gate_right, "scale:x", 2.0, 0.5)
+	if is_open:
+		for gate in _gate_nodes.get(gate_id, []):
+			FEEDBACK.burst(self, gate.global_position, Color("efb46b") if gate_id == "post_boss" else Color("6fe2cb"))
+		gate_opened.emit(gate_id)
 
 
 ## Define a paleta de cada caractere semântico do blueprint.

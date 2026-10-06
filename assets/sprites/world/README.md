@@ -1,6 +1,8 @@
 # Arte da caverna subaquática
 
-Assets bitmap criados com a ferramenta integrada de geração de imagens e importados como texturas do Godot. O jogo usa os sete PNGs abaixo. No Godot, `pixel_asset_cache.gd` reduz chão e trilha para 16×16 pixels lógicos; paredes, água e relíquia para 32×32; o atlas para 64×64 (quatro sprites de 32×32); e o portão para 96×64. O filtro `nearest` mantém pixels nítidos; a etapa em memória fixa a opacidade das texturas de terreno e reduz tons intermediários. O shader `cave_pool_ripple.gdshader` move discretamente as poças em passos de um pixel. O cache `.godot/` é recriado pelo editor.
+Assets bitmap criados com a ferramenta integrada de geração de imagens e importados como texturas do Godot. O jogo reutiliza os sete PNGs abaixo, sem modificar as fontes. No Godot, `pixel_asset_cache.gd` prepara chão, trilha, paredes, água, chave-bússola e portão em 64×64 pixels lógicos; o atlas usa 128×128 (quatro sprites de 64×64). As escalas dos objetos compensam a resolução para preservar seu tamanho no mundo. O filtro `nearest` mantém pixels nítidos; a etapa em memória fixa a opacidade das texturas de terreno e conserva 25 níveis por canal. O shader `cave_pool_ripple.gdshader` move discretamente as poças em passos de um pixel. O cache `.godot/` é recriado pelo editor.
+
+As paredes usam o perímetro da grade escalonada simplificado com tolerância de 52 pixels de mundo, revestido com a textura de 64×64 e uma borda iluminada contínua. Isso elimina a silhueta de losangos isolados nas diagonais; as colisões dos tiles são preservadas. O portão laranja usa duas metades da mesma textura que se recolhem para os lados e permanecem visíveis depois da abertura. As três bússolas existentes funcionam como chaves: qualquer uma abre o portão ao se aproximar após derrotar o Guardião.
 
 | Arquivo atual | Direção final do prompt |
 | --- | --- |

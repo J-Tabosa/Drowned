@@ -144,8 +144,22 @@ func _run() -> void:
 
 	victory_lab._boss.health_component.kill()
 	await process_frame
-	assert(victory_lab.arena.is_post_boss_gate_open())
+	assert(not victory_lab.arena.is_post_boss_gate_open())
+	assert(not victory_lab.arena.open_post_boss_gate())
+	assert(victory_lab.arena._exit_gate_art.modulate.a == 1.0)
 	assert(not victory_lab.result_panel.visible)
+	# Mesmo chegando à saída por teleporte, não vence sem destrancar o portão.
+	victory_lab.player.global_position = victory_lab.arena.get_anchor_position("post_boss_exit")
+	await process_frame
+	assert(not victory_lab.result_panel.visible)
+	victory_lab.player.global_position = victory_lab.arena.get_item_positions()[0]
+	for _frame in 4:
+		await physics_frame
+	assert(victory_lab.arena.has_exit_key())
+	victory_lab.player.global_position = victory_lab.arena._gate_nodes.post_boss[3].global_position + Vector2(0, -100)
+	await process_frame
+	await process_frame
+	assert(victory_lab.arena.is_post_boss_gate_open())
 	victory_lab.player.global_position = victory_lab.arena.get_anchor_position("post_boss_exit")
 	await process_frame
 	assert(victory_lab.result_panel.visible)

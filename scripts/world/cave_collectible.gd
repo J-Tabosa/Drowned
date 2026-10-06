@@ -14,7 +14,8 @@ func _ready() -> void:
 	collision_layer = 0
 	collision_mask = 1
 	monitoring = true
-	$Sprite2D.texture = PIXEL_ASSET.pixel_texture(RELIC_TEXTURE, Vector2i(32, 32))
+	$Sprite2D.texture = PIXEL_ASSET.pixel_texture(RELIC_TEXTURE, Vector2i(64, 64))
+	$Sprite2D.scale = Vector2.ONE * 1.5
 	_base_y = $Sprite2D.position.y
 	body_entered.connect(_on_body_entered)
 

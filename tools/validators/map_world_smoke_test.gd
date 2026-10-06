@@ -16,13 +16,14 @@ func _run() -> void:
 	assert(counts.wall > 80)
 	assert(counts.gate == 26)
 	assert(counts.items == 3)
-	assert(cave.floor_tiles.get_child(0).top_shape.texture.get_size() == Vector2(16, 16))
-	assert(cave.wall_tiles.get_child(0).top_shape.texture.get_size() == Vector2(32, 32))
+	assert(cave.floor_tiles.get_child(0).top_shape.texture.get_size() == Vector2(64, 64))
+	assert(cave.wall_tiles.get_child(0).top_shape.texture.get_size() == Vector2(64, 64))
+	assert(cave.get_node("ContinuousWallFaces").get_child_count() >= 3)
 	var water_tile: Node2D = cave.floor_tiles.get_node("Floor_21_60")
-	assert(water_tile.top_shape.texture.get_size() == Vector2(32, 32))
+	assert(water_tile.top_shape.texture.get_size() == Vector2(64, 64))
 	assert(water_tile.top_shape.material is ShaderMaterial)
-	assert(cave._exit_gate_art.texture.get_size() == Vector2(96, 64))
-	assert(cave.items.get_child(0).get_node("Sprite2D").texture.get_size() == Vector2(32, 32))
+	assert(cave._exit_gate_art.texture.get_size() == Vector2(64, 64))
+	assert(cave.items.get_child(0).get_node("Sprite2D").texture.get_size() == Vector2(64, 64))
 	assert(cave.get_mob_spawn_positions().size() == 7)
 	assert(cave.get_story_echo_positions().size() == 3)
 	assert(cave.get_item_positions().size() == 3)
@@ -44,15 +45,27 @@ func _run() -> void:
 	cave.open_boss_gate()
 	assert(_can_reach(cave, "P", "B", "12"))
 	assert(not _can_reach(cave, "P", "E", "12"))
-	cave.open_post_boss_gate()
-	await physics_frame
-	assert(_can_reach(cave, "P", "E", "123"))
+	assert(not cave.open_post_boss_gate())
 	var item_position: Vector2 = cave.get_item_positions()[0]
 	lab.player.global_position = item_position
 	await physics_frame
 	await physics_frame
 	assert(cave.get_collected_item_count() == 1)
-	assert(lab.relic_label.text == "RELÍQUIAS  1/3")
+	assert(lab.relic_label.text == "CHAVES  1/3")
+	assert(not cave.open_post_boss_gate())
+	cave.mark_boss_defeated()
+	assert(not cave.is_post_boss_gate_open())
+	assert(cave.open_post_boss_gate())
+	assert(not cave.open_post_boss_gate())
+	await create_timer(0.6).timeout
+	assert(not cave.has_exit_key())
+	assert(cave._exit_gate_art.modulate.a == 1.0)
+	assert(cave._exit_gate_right.modulate.a == 1.0)
+	assert(is_equal_approx(cave._exit_gate_art.scale.y, 4.8))
+	assert(_can_reach(cave, "P", "E", "123"))
+	for gate in cave._gate_nodes.post_boss:
+		assert(gate._collision_shape.disabled)
+		assert(cave.is_walkable(gate.global_position, 0.0))
 	print("MAP_WORLD_SMOKE_TEST_OK")
 	quit(0)
 
