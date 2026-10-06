@@ -65,3 +65,23 @@ func get_selected_profile() -> Dictionary:
 ## Registra o identificador escolhido para que ele persista durante a troca de cenas.
 func select_character(character_id: String) -> void:
 	selected_character_id = character_id
+
+
+# Preferência persistida, disponível também na primeira conversa do prólogo.
+const DIALOGUE_SPEEDS := [22.0, 42.0, 75.0, 0.0]
+var dialogue_speed_index := 1
+
+func _ready() -> void:
+	var config := ConfigFile.new()
+	if config.load("user://preferences.cfg") == OK:
+		dialogue_speed_index = clampi(int(config.get_value("dialogue", "speed", 1)), 0, 3)
+
+func set_dialogue_speed(index: int) -> void:
+	dialogue_speed_index = clampi(index, 0, 3)
+	var config := ConfigFile.new()
+	config.load("user://preferences.cfg")
+	config.set_value("dialogue", "speed", dialogue_speed_index)
+	config.save("user://preferences.cfg")
+
+func get_dialogue_speed() -> float:
+	return DIALOGUE_SPEEDS[dialogue_speed_index]

@@ -10,6 +10,7 @@ var _previews: Array[TextureRect] = []
 
 ## Monta os cartões, seleciona o primeiro perfil e prepara navegação por teclado.
 func _ready() -> void:
+	theme = NauticalUI.theme()
 	_build_cards()
 	_update_selection()
 	_card_buttons[0].grab_focus()
@@ -32,24 +33,20 @@ func _build_cards() -> void:
 	for index in GameState.CHARACTER_PROFILES.size():
 		var profile: Dictionary = GameState.CHARACTER_PROFILES[index]
 		var panel := PanelContainer.new()
-		panel.custom_minimum_size = Vector2(300, 355)
-		var style := StyleBoxFlat.new()
-		style.bg_color = Color("13293d")
-		style.border_color = Color(profile.color, 0.65)
-		style.set_border_width_all(2)
-		style.set_corner_radius_all(14)
-		style.content_margin_left = 22
-		style.content_margin_right = 22
-		style.content_margin_top = 22
-		style.content_margin_bottom = 22
+		panel.custom_minimum_size = Vector2(240, 310)
+		var style := NauticalUI.panel_style()
+		style.content_margin_left = 14
+		style.content_margin_right = 14
+		style.content_margin_top = 14
+		style.content_margin_bottom = 14
 		panel.add_theme_stylebox_override("panel", style)
 
 		var column := VBoxContainer.new()
-		column.add_theme_constant_override("separation", 12)
+		column.add_theme_constant_override("separation", 7)
 		panel.add_child(column)
 
 		var preview_space := CenterContainer.new()
-		preview_space.custom_minimum_size = Vector2(0, 125)
+		preview_space.custom_minimum_size = Vector2(0, 72)
 		column.add_child(preview_space)
 		var preview := TextureRect.new()
 		var portrait_path := String(profile.get("portrait", ""))
@@ -58,7 +55,7 @@ func _build_cards() -> void:
 		preview.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		preview.custom_minimum_size = Vector2(108, 125)
+		preview.custom_minimum_size = Vector2(80, 72)
 		preview.pivot_offset = preview.custom_minimum_size * 0.5
 		preview.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		preview_space.add_child(preview)
@@ -67,26 +64,29 @@ func _build_cards() -> void:
 		var name_label := Label.new()
 		name_label.text = profile.name
 		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		name_label.add_theme_font_size_override("font_size", 24)
+		name_label.add_theme_font_size_override("font_size", 20)
 		column.add_child(name_label)
 
 		var role_label := Label.new()
 		role_label.text = profile.role
+		role_label.custom_minimum_size.y = 20
 		role_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		role_label.add_theme_color_override("font_color", profile.color)
-		role_label.add_theme_font_size_override("font_size", 16)
+		role_label.add_theme_font_size_override("font_size", 14)
 		column.add_child(role_label)
 
 		var description := Label.new()
 		description.text = profile.description
 		description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		description.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		description.custom_minimum_size.y = 65
+		description.custom_minimum_size.y = 72
+		description.add_theme_font_size_override("font_size", 13)
 		column.add_child(description)
 
 		var button := Button.new()
 		button.text = "Escolher"
-		button.custom_minimum_size.y = 44
+		button.custom_minimum_size.y = 32
+		button.add_theme_font_size_override("font_size", 14)
 		button.pressed.connect(_confirm_selection.bind(index))
 		button.focus_entered.connect(_focus_card.bind(index))
 		button.mouse_entered.connect(_focus_card.bind(index))

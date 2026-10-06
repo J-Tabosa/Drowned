@@ -46,6 +46,8 @@ var _portrait_cache: Dictionary = {}
 var _mouths: Dictionary = {}
 var _speaker_slot := ""
 var _mouth_time := 0.0
+var _text_scroll: ScrollContainer
+var _skip_requested := false
 
 const MOUTH_SOURCE_POINTS := {
 	"breaker": Vector2(640, 480),
@@ -57,6 +59,23 @@ const MOUTH_SOURCE_POINTS := {
 ## Mantém o overlay escondido e sem processamento até uma sequência ser iniciada.
 func _ready() -> void:
 	curtain.visible = false
+	curtain.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	dialogue_box.theme = NauticalUI.theme()
+	dialogue_box.add_theme_stylebox_override("panel", NauticalUI.panel_style())
+	var content := dialogue_box.get_node("Content")
+	_text_scroll = ScrollContainer.new()
+	_text_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_text_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content.add_child(_text_scroll)
+	content.move_child(_text_scroll, 1)
+	dialogue_label.reparent(_text_scroll)
+	dialogue_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	dialogue_label.custom_minimum_size = Vector2.ZERO
+	continue_indicator.text = "Enter / Espaço · avançar     Esc · pular"
+	continue_indicator.modulate.a = 0.45
+	continue_indicator.add_theme_font_size_override("font_size", 11)
+	dialogue_accent.hide()
+	bottom_bar.hide()
 	for slot_name in ["left", "center", "right"]:
 		var portrait: Control = _get_slot_nodes(slot_name).portrait
 		var mouth := Polygon2D.new()
@@ -78,9 +97,9 @@ func _ready() -> void:
 func _layout_stage() -> void:
 	var screen := get_viewport().get_visible_rect().size
 	var slot_height := screen.y * 0.66
-	var slot_width := minf(450.0, screen.y * 0.72)
+	var slot_width := minf(screen.x * 0.29, screen.y * 0.62)
 	var slot_top := screen.y * 0.035
-	var side_inset := -minf(36.0, screen.x * 0.03)
+	var side_inset := screen.x * 0.025
 	var positions := {
 		"left": Vector2(side_inset, slot_top),
 		"center": Vector2((screen.x - slot_width) * 0.5, slot_top),
@@ -93,27 +112,19 @@ func _layout_stage() -> void:
 		portrait.pivot_offset = portrait.size * 0.5
 		if _actors.has(_slots.get(slot_name, "")):
 			_place_mouth(slot_name, _actors[_slots[slot_name]])
-	var box_width := minf(1000.0, screen.x * 0.90)
-	var box_top := minf(screen.y * 0.58, screen.y - 170.0)
-	var box_bottom := screen.y - 10.0
-	if screen.y < 480.0:
-		speaker_label.add_theme_font_size_override("font_size", 17)
-		dialogue_label.add_theme_font_size_override("font_size", 15)
-		dialogue_label.custom_minimum_size.y = 58.0
-		continue_indicator.add_theme_font_size_override("font_size", 15)
-	else:
-		speaker_label.add_theme_font_size_override("font_size", 21)
-		dialogue_label.add_theme_font_size_override("font_size", 18)
-		dialogue_label.custom_minimum_size.y = 67.0
-		continue_indicator.add_theme_font_size_override("font_size", 18)
-	dialogue_box.position = Vector2((screen.x - box_width) * 0.5, box_top)
-	dialogue_box.size = Vector2(box_width, box_bottom - box_top)
-	dialogue_accent.position = dialogue_box.position + Vector2(-12.0, -10.0)
-	dialogue_accent.polygon = PackedVector2Array([
-		Vector2(0, 20), Vector2(46, 0), Vector2(box_width + 24.0, 0),
-		Vector2(box_width - 4.0, box_bottom - box_top + 20.0),
-		Vector2(20, box_bottom - box_top + 20.0),
-	])
+	var pixel_scale := screen.x / float(get_window().size.x)
+	var box_width := minf(820.0, float(get_window().size.x) * 0.88)
+	var box_height := 150.0
+	speaker_label.add_theme_font_size_override("font_size", 17)
+	dialogue_label.add_theme_font_size_override("font_size", 16)
+	continue_indicator.add_theme_font_size_override("font_size", 11)
+	dialogue_label.custom_minimum_size.y = 0.0
+	dialogue_box.scale = Vector2.ONE * pixel_scale
+	dialogue_box.position = Vector2((screen.x - box_width * pixel_scale) * 0.5, screen.y - (box_height + 18.0) * pixel_scale)
+	dialogue_box.size = Vector2(box_width, box_height)
+	for slot_name in ["left", "center", "right"]:
+		_slot_home_positions[slot_name] = positions[slot_name]
+
 
 
 ## Recebe atores, ocupação inicial e falas; depois toca a entrada cinematográfica.
@@ -121,7 +132,7 @@ func start(sequence: Dictionary) -> void:
 	_actors = sequence.get("actors", {})
 	_slots = sequence.get("initial_slots", {}).duplicate()
 	_lines = sequence.get("lines", [])
-	_characters_per_second = float(sequence.get("characters_per_second", 42.0))
+	_characters_per_second = GameState.get_dialogue_speed()
 	if _lines.is_empty():
 		finished.emit()
 		return
@@ -139,13 +150,23 @@ func start(sequence: Dictionary) -> void:
 	set_process(true)
 	await _animate_opening()
 	_transitioning = false
+	if _skip_requested:
+		_close()
+		return
 	_line_index = 0
 	await _show_current_line()
 
 
 ## Revela o texto gradualmente de acordo com a velocidade configurada na sequência.
 func _process(delta: float) -> void:
+	if _skip_requested and _active and not _transitioning:
+		_close()
+		return
 	if not _active or not _typing:
+		return
+	_characters_per_second = GameState.get_dialogue_speed()
+	if _characters_per_second == 0.0:
+		_finish_typing()
 		return
 	_mouth_time += delta
 	_set_speaker_mouth(fmod(_mouth_time, 0.23) < 0.115)
@@ -158,10 +179,20 @@ func _process(delta: float) -> void:
 
 ## Intercepta confirmação, ação primária ou clique para completar/avançar a fala.
 func _unhandled_input(event: InputEvent) -> void:
-	if not _active or _transitioning:
+	if not _active:
+		return
+	if event.is_action_pressed("ui_cancel"):
+		get_viewport().set_input_as_handled()
+		_request_skip()
+		return
+	if _transitioning:
+		return
+	if event is InputEventKey and event.pressed and event.keycode in [KEY_PAGEUP, KEY_PAGEDOWN]:
+		_text_scroll.scroll_vertical += int(_text_scroll.size.y * (1 if event.keycode == KEY_PAGEDOWN else -1))
+		get_viewport().set_input_as_handled()
 		return
 	var clicked: bool = event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT
-	if event.is_action_pressed("ui_accept") or event.is_action_pressed("primary_action") or clicked:
+	if event.is_action_pressed("ui_accept") or event.is_action_pressed("primary_action") or (clicked and _text_scroll.get_global_rect().has_point(event.position)):
 		get_viewport().set_input_as_handled()
 		_advance()
 
@@ -388,11 +419,14 @@ func _show_current_line() -> void:
 	dialogue_label.text = line.get("text", "")
 	dialogue_label.visible_characters = 0
 	_revealed_characters = 0.0
+	_text_scroll.scroll_vertical = 0
 	_mouth_time = 0.0
 	_typing = true
 	_transitioning = false
-	continue_indicator.visible = false
+	continue_indicator.visible = true
 	_focus_actor(actor_id)
+	if GameState.get_dialogue_speed() == 0.0:
+		_finish_typing()
 
 
 ## Localiza o slot do falante, clareia-o e recua os demais participantes.
@@ -421,9 +455,7 @@ func _finish_typing() -> void:
 	_set_speaker_mouth(false)
 	dialogue_label.visible_characters = -1
 	continue_indicator.visible = true
-	_indicator_tween = create_tween().set_loops()
-	_indicator_tween.tween_property(continue_indicator, "position:y", continue_indicator.position.y + 5.0, 0.38)
-	_indicator_tween.tween_property(continue_indicator, "position:y", continue_indicator.position.y, 0.38)
+
 
 
 ## Completa a digitação atual ou passa para a próxima linha; no fim, fecha o overlay.
@@ -436,6 +468,12 @@ func _advance() -> void:
 		_close()
 	else:
 		_show_current_line()
+
+
+func _request_skip() -> void:
+	_skip_requested = true
+	if _active and not _transitioning:
+		_close()
 
 
 ## Retira barras, caixa e todos os slots da tela antes de emitir finished.

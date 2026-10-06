@@ -197,53 +197,141 @@ func _on_player_damaged(amount: float, source: Vector2) -> void:
 	FEEDBACK.impact(self, player.global_position, source.direction_to(player.global_position))
 
 
+var _hud_columns: Dictionary = {}
+var _objective_toggle: Button
+var _objective_time_left := 0.0
+var _objective_pinned := false
+var _hud_pixel_scale := 1.0
+var _objective_mouse_position := Vector2(-100, -100)
+
+
 func _style_hud() -> void:
+	var accent: Color = GameState.get_selected_profile().color
+	for node in [$Interface/TopPanel, $Interface/ObjectivePanel, tutorial_panel, boss_panel,
+		result_panel, $Interface/PausePanel/PauseCard, settings_card]:
+		node.theme = NauticalUI.theme(accent)
+		NauticalUI.skin(node)
+	_hud_columns["status"] = NauticalUI.column($Interface/TopPanel, [character_label, health_label, health_bar, action_label, cooldown_bar])
+	_hud_columns["objective"] = NauticalUI.column($Interface/ObjectivePanel, [stage_label, objective_label], true)
+	_hud_columns["tutorial"] = NauticalUI.column(tutorial_panel, [tutorial_title, tutorial_step, tutorial_progress], true)
+	_hud_columns["boss"] = NauticalUI.column(boss_panel, [boss_name_label, boss_health_bar])
+	_hud_columns["result"] = NauticalUI.column(result_panel, [result_title, result_detail], true)
+	for path in ["TopPanel/TopAccent", "ObjectivePanel/ObjectiveAccent", "TutorialPanel/TutorialAccent"]:
+		$Interface.get_node(path).hide()
+	$Interface/PausePanel/SettingsCard/SettingsInfo.hide()
+	var speed := NauticalUI.speed_selector()
+	settings_card.add_child(speed)
+	speed.position = Vector2(24, 178)
+	speed.size = Vector2(300, 42)
 	_style_bar(health_bar, Color("de6572"))
-	_style_bar(cooldown_bar, Color("49caba"))
+	_style_bar(cooldown_bar, accent)
 	_style_bar(tutorial_progress, Color("52d7b0"))
 	_style_bar(boss_health_bar, Color("af76c8"))
-
+	NauticalUI.navigation_heading(character_label, accent)
+	NauticalUI.navigation_heading(stage_label, Color("52d7b0"))
+	NauticalUI.navigation_heading(tutorial_title, Color("52d7b0"))
+	for panel in [$Interface/TopPanel, $Interface/ObjectivePanel, tutorial_panel, boss_panel]:
+		var margin: MarginContainer = panel.get_node("Layout")
+		for side in ["left", "top", "right", "bottom"]:
+			margin.add_theme_constant_override("margin_" + side, 10)
+	for key in ["status", "objective", "tutorial", "boss"]:
+		_hud_columns[key].add_theme_constant_override("separation", 4)
+	for label in [health_label, action_label, stage_label, objective_label, tutorial_step, tutorial_title, boss_name_label]:
+		label.add_theme_font_size_override("font_size", 13)
+	for label in [character_label, stage_label, tutorial_title]:
+		label.get_parent().get_child(0).custom_minimum_size = Vector2(16, 16)
+	health_bar.custom_minimum_size.y = 7
+	cooldown_bar.custom_minimum_size.y = 5
+	tutorial_progress.custom_minimum_size.y = 5
+	boss_health_bar.custom_minimum_size.y = 10
+	_objective_toggle = Button.new()
+	_objective_toggle.name = "ObjectiveToggle"
+	_objective_toggle.text = "Missão ▾"
+	_objective_toggle.toggle_mode = true
+	_objective_toggle.add_theme_font_size_override("font_size", 12)
+	_objective_toggle.theme = NauticalUI.theme(Color("52d7b0"))
+	for state in ["normal", "hover", "pressed", "focus"]:
+		var style: StyleBox = _objective_toggle.get_theme_stylebox(state).duplicate()
+		style.set_content_margin_all(4)
+		_objective_toggle.add_theme_stylebox_override(state, style)
+	_objective_toggle.toggled.connect(func(pinned: bool) -> void:
+		_objective_pinned = pinned
+		if not pinned:
+			_objective_time_left = 0.0
+	)
+	$Interface.add_child(_objective_toggle)
+	character_label.add_theme_font_size_override("font_size", 16)
+	result_title.add_theme_font_size_override("font_size", 23)
 
 func _style_bar(bar: ProgressBar, fill_color: Color) -> void:
-	var background := StyleBoxFlat.new()
-	background.bg_color = Color("243b4a")
-	background.set_corner_radius_all(4)
+	var background := NauticalUI.flat(Color("142e3a"), NauticalUI.BRASS)
+	background.set_content_margin_all(0)
 	var fill := StyleBoxFlat.new()
 	fill.bg_color = fill_color
-	fill.set_corner_radius_all(4)
 	bar.add_theme_stylebox_override("background", background)
 	bar.add_theme_stylebox_override("fill", fill)
 
+func _place_panel(panel: Control, rect: Rect2) -> void:
+	panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	panel.position = rect.position
+	panel.size = rect.size
 
 func _layout_hud() -> void:
-	var width := get_viewport().get_visible_rect().size.x
-	var compact := width < 760.0
-	var top_panel: ColorRect = $Interface/TopPanel
-	var objective_panel: ColorRect = $Interface/ObjectivePanel
-	var panel_width := 294.0 if compact else 332.0
-	var margin := 12.0 if compact else 22.0
-	var scale_factor := minf(1.0, (width - 3.0 * margin) / (2.0 * panel_width)) if compact else 1.0
-	top_panel.size.x = panel_width
-	objective_panel.size.x = panel_width
-	top_panel.scale = Vector2.ONE * scale_factor
-	objective_panel.scale = Vector2.ONE * scale_factor
-	top_panel.position = Vector2(margin, 10.0 if compact else 18.0)
-	objective_panel.position = Vector2(width - margin - panel_width * scale_factor, 10.0 if compact else 18.0)
-	$Interface/TopPanel/TopAccent.size.x = panel_width
-	$Interface/ObjectivePanel/ObjectiveAccent.size.x = panel_width
-	character_label.offset_right = panel_width - 18.0
-	action_label.offset_right = panel_width - 18.0
-	health_bar.offset_left = 124.0 if compact else 136.0
-	health_bar.offset_right = panel_width - 18.0
-	cooldown_bar.offset_right = panel_width - 18.0
-	stage_label.offset_right = panel_width - 14.0
-	objective_label.offset_right = panel_width - 14.0
-	_feedback_label.position = Vector2(margin, 156)
-	_feedback_label.size = Vector2(width - margin * 2.0, 56)
+	var logical := get_viewport().get_visible_rect().size
+	_hud_pixel_scale = logical.x / float(get_window().size.x)
+	var screen := logical / _hud_pixel_scale
+	var margin := 12.0
+	var width := minf(280.0, screen.x * 0.42)
+	var objective_width := minf(360.0, screen.x - width - margin * 3)
+	var objective_x := maxf(width + margin * 2, (screen.x - objective_width) * 0.5)
+	_place_compact_panel($Interface/TopPanel, Rect2(margin, margin, width, 126))
+	_place_compact_panel($Interface/ObjectivePanel, Rect2(objective_x, 44, objective_width, 94))
+	_place_compact_panel(_objective_toggle, Rect2(objective_x + objective_width - 100, margin, 100, 26))
+	var context_width := minf(300.0, screen.x * 0.44)
+	_place_compact_panel(tutorial_panel, Rect2(screen.x - context_width - margin, screen.y - 94 - margin, context_width, 94))
+	_place_compact_panel(boss_panel, Rect2(screen.x - context_width - margin, screen.y - 76 - margin, context_width, 76))
+	relic_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	relic_label.scale = Vector2.ONE * _hud_pixel_scale
+	relic_label.position = Vector2(margin, screen.y - 28) * _hud_pixel_scale
+	relic_label.size = Vector2(180, 20)
+	relic_label.add_theme_font_size_override("font_size", 12)
+	enemy_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	enemy_label.scale = Vector2.ONE * _hud_pixel_scale
+	enemy_label.position = Vector2((screen.x - 260) * 0.5, 148) * _hud_pixel_scale
+	enemy_label.size = Vector2(260, 24)
+	var result_size := Vector2(minf(400, screen.x - 24), minf(220, screen.y - 24))
+	_place_compact_panel(result_panel, Rect2((screen - result_size) * 0.5, result_size))
+	result_panel.get_node("Layout").offset_bottom = -64
+	var restart: Button = result_panel.get_node("Restart")
+	restart.position = Vector2(24, result_size.y - 58)
+	restart.size = Vector2(result_size.x - 48, 42)
+	_feedback_label.scale = Vector2.ONE * _hud_pixel_scale
+	_feedback_label.position = Vector2(margin, 170) * _hud_pixel_scale
+	_feedback_label.size = Vector2(screen.x - margin * 2.0, 56)
+
+func _place_compact_panel(panel: Control, rect: Rect2) -> void:
+	_place_panel(panel, Rect2(rect.position * _hud_pixel_scale, rect.size))
+	panel.scale = Vector2.ONE * _hud_pixel_scale
+
+func _update_objective_visibility(delta: float) -> void:
+	var panel: Control = $Interface/ObjectivePanel
+	if _round_finished:
+		panel.hide()
+		_objective_toggle.hide()
+		return
+	if not get_tree().paused:
+		_objective_time_left = maxf(0, _objective_time_left - delta)
+	var mouse := _objective_mouse_position
+	var hovering := _objective_toggle.get_global_rect().has_point(mouse)
+	if panel.visible:
+		hovering = hovering or panel.get_global_rect().has_point(mouse)
+	panel.visible = _objective_pinned or hovering or _objective_time_left > 0
+	_objective_toggle.text = "Missão ▴" if _objective_pinned else "Missão ▾"
 
 
 ## Monitora requisitos e proximidade dos marcadores C e B desenhados no blueprint.
 func _process(delta: float) -> void:
+	_update_objective_visibility(delta)
 	if get_tree().paused or _round_finished or not is_instance_valid(player):
 		return
 	_feedback_time = maxf(0.0, _feedback_time - delta)
@@ -536,6 +624,10 @@ func _begin_boss_fight(skip_card := false) -> void:
 
 ## Atualiza o dispositivo de entrada, alterna fullscreen/debug e mantém atalhos globais ativos.
 func _input(event: InputEvent) -> void:
+	if event is InputEventMouseMotion:
+		_objective_mouse_position = event.position
+	if DialogueManager.is_playing():
+		return
 	if event.is_action_pressed("ui_cancel"):
 		_toggle_pause()
 		get_viewport().set_input_as_handled()
@@ -694,6 +786,11 @@ func _set_stage_text(text: String) -> void:
 ## Atualiza o objetivo principal sem espalhar acesso direto ao HUD.
 func _set_objective(text: String) -> void:
 	objective_label.text = text
+	_objective_time_left = 5.0
+	_objective_pinned = false
+	_objective_toggle.set_pressed_no_signal(false)
+	$Interface/ObjectivePanel.get_node("Layout/TextScroll").scroll_vertical = 0
+	_update_objective_visibility(0.0)
 
 
 ## Exibe o resultado somente na derrota ou quando o jogador realmente atravessa a saída.

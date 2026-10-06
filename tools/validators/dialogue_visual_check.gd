@@ -31,7 +31,7 @@ func _run() -> void:
 		assert(overlay._line_index == 0)
 		print("dialogue viewport/window: ", overlay.get_viewport().get_visible_rect().size, " / ", root.size)
 		assert(absf(overlay.left_portrait.size.y / overlay.get_viewport().get_visible_rect().size.y - 0.66) < 0.01)
-		assert(overlay.dialogue_box.position.y < overlay.left_portrait.position.y + overlay.left_portrait.size.y)
+		assert(Rect2(Vector2.ZERO, overlay.get_viewport().get_visible_rect().size).encloses(Rect2(overlay.dialogue_box.position, overlay.dialogue_box.size * overlay.dialogue_box.scale)))
 		assert(overlay._typing)
 		print(character_id, " regions: ", (overlay.left_texture.texture as AtlasTexture).region, " / ", (overlay.center_texture.texture as AtlasTexture).region, " / ", (overlay.right_texture.texture as AtlasTexture).region)
 		overlay._finish_typing()
