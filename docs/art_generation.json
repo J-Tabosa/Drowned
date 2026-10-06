@@ -1,13 +1,10 @@
 {
-  "method": "Godot native pixel layers; original character sprites",
-  "resolution": "320x180 fixed stage, nearest filtering",
+  "method": "Built-in image_gen; compact nearest-neighbor assets with limited palettes",
+  "resolution": "320x180 logical stage; 104x128 stern sprite",
+  "reference": "User rocky dark-teal pixel-art tile screenshot",
   "title": "scripts/ui/title_ocean.gd",
   "dialogue": "scripts/narrative/cave_background.gd",
-  "crew": [
-    "assets/sprites/characters/quebra_mar_source.png",
-    "assets/sprites/characters/vigia_source.png",
-    "assets/sprites/characters/mergulhador_source.png"
-  ],
+  "prompts": "docs/title_art_prompts.json",
   "animation": "assets/art/title/fishing_boat_loop.gif",
-  "note": "Original sprites remain unchanged. Replaced the generated paintings with simple native layers; previous ImageGen prompts remain in Git history."
+  "note": "Boat viewed from the stern, without characters. Sky, two cloud planes, three water planes, boat and weather are animated independently. Original character portraits are unchanged."
 }

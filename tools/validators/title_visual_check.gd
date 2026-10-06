@@ -23,6 +23,29 @@ func _run() -> void:
 	current_scene = title
 	await create_timer(0.1).timeout
 	await _capture("title_calm")
+	title._open_settings()
+	await process_frame
+	await process_frame
+	await _capture("title_settings")
+	title._close_modal()
+	title._open_credits()
+	await process_frame
+	await process_frame
+	await _capture("title_credits")
+	title._close_modal()
+	root.size = Vector2i(640, 360)
+	await process_frame
+	title._layout()
+	await process_frame
+	await _capture("title_small")
+	title._open_credits()
+	await process_frame
+	await process_frame
+	await _capture("credits_small")
+	title._close_modal()
+	root.size = Vector2i(1152, 648)
+	await process_frame
+	title._layout()
 	title.ocean.manual_time = true
 	for frame in 48:
 		title.ocean.animation_time = float(frame) * 0.1
@@ -34,7 +57,7 @@ func _run() -> void:
 	title.ocean.storm = 1.0
 	title.ocean.lightning = 0.85
 	title.title.hide()
-	title.play_button.hide()
+	title._menu.hide()
 	title.ocean._update_art()
 	await process_frame
 	await _capture("title_storm")
