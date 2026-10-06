@@ -24,7 +24,27 @@ func _run() -> void:
 	current_scene = title
 	await process_frame
 	assert(ProjectSettings.get_setting("application/run/main_scene").ends_with("title_screen.tscn"))
-	assert(title.ocean._boat.texture != null and title.ocean._sea.texture != null)
+	assert(title.get_node("PixelOcean/OceanViewport").size == Vector2i(320, 180))
+	assert(title.ocean._crew.size() == 3)
+	for index in 3:
+		var sailor: Sprite2D = title.ocean._crew[index]
+		assert(sailor.texture is AtlasTexture)
+		assert(sailor.texture.atlas.resource_path == title.ocean.CREW_SOURCES[index],
+			"Boat passengers must use the exact original artwork")
+		assert(sailor.get_parent() == title.ocean._boat, "Crew must move with the hull")
+	var calm_position: Vector2 = title.ocean._boat.position
+	var calm_rotation: float = title.ocean._boat.rotation
+	title.ocean.manual_time = true
+	title.ocean.animation_time = 1.2
+	title.ocean._update_art()
+	assert(title.ocean._boat.position != calm_position and title.ocean._boat.rotation != calm_rotation)
+	var loop_position: Vector2 = title.ocean._boat.position
+	var loop_rotation: float = title.ocean._boat.rotation
+	title.ocean.animation_time += title.ocean.LOOP_SECONDS
+	title.ocean._update_art()
+	assert(title.ocean._boat.position == loop_position)
+	assert(is_equal_approx(title.ocean._boat.rotation, loop_rotation), "GIF motion must loop smoothly")
+	title.ocean.manual_time = false
 	assert(title.ocean.storm == 0.0)
 	await create_timer(0.2).timeout
 	assert(title.ocean.animation_time > 0.0)
@@ -56,6 +76,7 @@ func _run() -> void:
 	assert(not overlay.top_bar.visible)
 	assert(overlay._cave_background.visible)
 	var cave: Variant = overlay._cave_background.get_node("CaveViewport/Cave")
+	assert(overlay._cave_background.get_node("CaveViewport").size == Vector2i(320, 180))
 	assert(cave.animation_time > 0.0, "Cave animation must continue during dialogue pause")
 	assert(cave._drops.is_empty(), "Drops must remain rare")
 	cave._spawn_drop()

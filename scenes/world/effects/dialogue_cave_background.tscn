@@ -1,8 +1,12 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/narrative/cave_background.gd" id="1"]
 
-[node name="DialogueCave" type="SubViewportContainer"]
+[sub_resource type="ViewportTexture" id="ViewportTexture_cave"]
+resource_local_to_scene = true
+viewport_path = NodePath("CaveViewport")
+
+[node name="DialogueCave" type="TextureRect"]
 process_mode = 3
 texture_filter = 1
 layout_mode = 3
@@ -12,21 +16,19 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-stretch = true
-stretch_shrink = 2
+texture = SubResource("ViewportTexture_cave")
+expand_mode = 1
+stretch_mode = 0
 
 [node name="CaveViewport" type="SubViewport" parent="."]
 disable_3d = true
 handle_input_locally = false
-size = Vector2i(480, 270)
+size = Vector2i(320, 180)
 render_target_update_mode = 4
 
 [node name="Cave" type="Control" parent="CaveViewport"]
-layout_mode = 3
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
+layout_mode = 0
+offset_right = 320.0
+offset_bottom = 180.0
 mouse_filter = 2
 script = ExtResource("1")
