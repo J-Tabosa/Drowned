@@ -56,7 +56,7 @@ func _run() -> void:
 	player.global_position = lab.arena._gate_nodes.tutorial[2].global_position + Vector2(-100, 0)
 	await process_frame
 	await process_frame
-	assert(lab._feedback_label.text.contains("três ecos"))
+	assert(lab._feedback_label.text.contains("mova-se"))
 	var notification: float = lab._feedback_time
 	await create_timer(0.1).timeout
 	assert(lab._feedback_time < notification)
@@ -64,7 +64,7 @@ func _run() -> void:
 	lab._sprint_done = true
 	lab._action_done = true
 	lab._try_complete_tutorial()
-	assert(lab._feedback_label.text.contains("Treinamento concluído"))
+	assert(lab._feedback_label.text.contains("Rota liberada"))
 	# Morte não deixa o anel nem reativa a habilidade ao terminar a recarga.
 	player._use_primary_action()
 	player.health_component.kill()

@@ -8,7 +8,8 @@ o layout compacto, as missões recolhíveis e os avisos de combate.
 ## Controles
 
 - WASD / setas: mover. Ctrl: correr.
-- Espaço / J / clique esquerdo: ataque original do personagem, mirando no cursor.
+- Espaço / J / clique esquerdo: segure para repetir o ataque, mirando no cursor.
+- Shift: esquiva curta. E: investigar ecos opcionais. Veja [`gameplay_rhythm.md`](gameplay_rhythm.md).
 - **Q / botão direito: habilidade especial**, com recarga independente.
 - Esc: pausa. Configurações: volume da música, névoa e velocidade dos diálogos.
 - Passe o cursor sobre a passiva ou especial na seleção e no HUD para ler os efeitos.

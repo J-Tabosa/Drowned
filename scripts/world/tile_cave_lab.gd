@@ -16,7 +16,7 @@ enum EncounterStage {
 	COMPLETE,
 }
 
-const MOVEMENT_DISTANCE_REQUIRED := 420.0
+const MOVEMENT_DISTANCE_REQUIRED := 220.0
 const SPRINT_DISTANCE_REQUIRED := 180.0
 const COMBAT_TRIGGER_RADIUS := 260.0
 const BOSS_TRIGGER_RADIUS := 430.0
@@ -81,6 +81,18 @@ var _reject_wait := 0.0
 var _skill_label: Label
 var _skill_bar: ProgressBar
 var _passive_label: Label
+var _path_encounter_index := 0
+var _echoes_found: Array[int] = []
+var _near_echo := -1
+var _reward_panel: ColorRect
+var _reward_pending := false
+var _defeats := 0
+var _run_time := 0.0
+var _upgrades: Array[String] = []
+var _approach_pack_spawned := false
+var _guide_path := PackedVector2Array()
+var _guide_target := Vector2.INF
+var _guide_wait := 0.0
 
 
 ## Inicializa jogador e HUD usando exclusivamente marcadores fornecidos pelo blueprint do mapa.
@@ -95,6 +107,9 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_layout_hud)
 	_layout_hud()
 	_spawn_player()
+	_reward_panel = preload("res://scripts/ui/run_reward_panel.gd").new()
+	$Interface.add_child(_reward_panel)
+	_reward_panel.chosen.connect(_choose_wave_reward)
 	arena.item_collected.connect(_on_item_collected)
 	arena.gate_opened.connect(_on_gate_opened)
 	_on_item_collected(0, arena.get_item_positions().size())
@@ -105,7 +120,7 @@ func _ready() -> void:
 	_update_enemy_label()
 	_update_tutorial_panel()
 	_set_stage_text("1/3  EXPLORAÇÃO")
-	_set_objective("Pratique os controles para iniciar a exploração.")
+	_set_objective("Avance pela gruta. Shift esquiva; segure o ataque; Q usa o especial.")
 	_refresh_action_prompt()
 
 
@@ -381,14 +396,28 @@ func _process(delta: float) -> void:
 	_cooldown_label.add_theme_color_override("font_color", Color("80e5ec") if not player.can_receive_damage() else Color("83dfbe") if remaining == 0.0 else Color("bdcbd4"))
 	_refresh_skill_status()
 	_check_gate_interaction()
+	if player._controls_enabled:
+		_run_time += delta
+	_guide_wait = maxf(0.0, _guide_wait - delta)
+	if _stage in [EncounterStage.REACH_COMBAT, EncounterStage.REACH_BOSS, EncounterStage.REACH_EXIT]:
+		_check_story_echoes()
+		if get_tree().paused:
+			return
+	queue_redraw()
 	if _stage == EncounterStage.MOVEMENT_TUTORIAL:
 		_track_tutorial()
-	elif _stage == EncounterStage.EXPLORE_ECHOES:
-		_check_story_echoes()
 	elif _stage == EncounterStage.REACH_COMBAT:
+		_check_path_encounter()
 		if player.global_position.distance_to(arena.get_anchor_position("combat_trigger")) <= COMBAT_TRIGGER_RADIUS:
 			_start_combat_encounter()
 	elif _stage == EncounterStage.REACH_BOSS:
+		var distance: float = player.global_position.distance_to(arena.get_anchor_position("boss_spawn"))
+		if not _approach_pack_spawned and distance < 2400.0 and distance > 800.0:
+			_approach_pack_spawned = true
+			MusicDirector.set_context("waves")
+			for index in 2:
+				_spawn_warned_enemy(_nearby_spawn(index, 2), _enemy_profile("hunter" if index == 0 else "sailor"))
+			_notify("A guarda do fosso se aproxima", Color("efb46b"))
 		if player.global_position.distance_to(arena.get_anchor_position("boss_spawn")) <= BOSS_TRIGGER_RADIUS:
 			_begin_boss_fight()
 	elif _stage == EncounterStage.REACH_EXIT:
@@ -440,17 +469,21 @@ func _track_tutorial() -> void:
 	_try_complete_tutorial()
 
 
-## Depois dos controles, conduz o jogador por três descobertas curtas antes da primeira arena.
+## Movimento já abre a rota; corrida e ataques são aprendidos enquanto se joga.
 func _try_complete_tutorial() -> void:
-	if _stage != EncounterStage.MOVEMENT_TUTORIAL:
+	if _stage != EncounterStage.MOVEMENT_TUTORIAL or not _movement_done:
 		return
-	if not _movement_done or not _sprint_done or not _action_done:
-		return
-	_stage = EncounterStage.EXPLORE_ECHOES
-	_objective_completed("Treinamento concluído")
-	tutorial_title.text = "ECOS DA GRUTA"
-	_set_objective("Investigue os sinais deixados entre os destroços.")
-	_update_story_panel()
+	_stage = EncounterStage.REACH_COMBAT
+	arena.open_tutorial_gate()
+	_objective_completed("Rota liberada")
+	_set_objective("Siga para a Câmara dos Afogados. Ecos são opcionais: E para investigar.")
+	tutorial_title.text = "LUTE EM MOVIMENTO"
+	tutorial_step.text = "Shift: esquiva • segure o ataque • Q: especial."
+	tutorial_progress.value = 100.0
+	get_tree().create_timer(4.0, false).timeout.connect(func() -> void:
+		if is_instance_valid(tutorial_panel):
+			tutorial_panel.hide()
+	)
 
 
 ## Mostra somente a instrução atual para não transformar o tutorial em uma lista permanente.
@@ -471,48 +504,108 @@ func _update_tutorial_panel() -> void:
 		tutorial_progress.value = 100.0
 
 
-## Dispara um diálogo curto ao encontrar cada eco, na ordem em que eles levam à câmara.
+## Os ecos mantêm a narrativa, mas exigem interação e não travam a rota principal.
 func _check_story_echoes() -> void:
-	var echo_positions: Array[Vector2] = arena.get_story_echo_positions()
-	if _story_echo_index >= echo_positions.size():
-		_finish_story_echoes()
+	var positions: Array[Vector2] = arena.get_story_echo_positions()
+	var nearby := -1
+	for index in positions.size():
+		if not _echoes_found.has(index) and player.global_position.distance_to(positions[index]) < STORY_ECHO_RADIUS:
+			nearby = index
+			break
+	if nearby != _near_echo and nearby >= 0:
+		_notify("E: investigar eco • história opcional", Color("83dfbe"))
+	_near_echo = nearby
+	if nearby < 0 or not Input.is_action_just_pressed("interact") or not player._controls_enabled:
 		return
-	if player.global_position.distance_to(echo_positions[_story_echo_index]) > STORY_ECHO_RADIUS:
+	if _enemies_alive > 0:
+		_notify("Afaste as ameaças antes de investigar.", Color("efb46b"))
 		return
-	var discovered_index := _story_echo_index
-	_story_echo_index += 1
-	arena.complete_story_echo(discovered_index)
-	_objective_completed("Eco %d de 3 investigado" % _story_echo_index)
-	_update_story_panel()
+	_echoes_found.append(nearby)
+	_story_echo_index = _echoes_found.size()
+	arena.complete_story_echo(nearby)
+	player.health_component.heal(10.0)
+	player.skill_cooldown_remaining = 0.0
 	if not skip_cinematics_for_tests:
-		await DialogueManager.play(DIALOGUE_CATALOG.get_exploration_echo(GameState.selected_character_id, discovered_index))
-	_finish_story_echoes()
+		await DialogueManager.play(DIALOGUE_CATALOG.get_exploration_echo(GameState.selected_character_id, nearby))
+	_notify("Eco %d/3 • +10 vida e especial pronto" % _story_echo_index, Color("83dfbe"))
 
 
-func _update_story_panel() -> void:
-	var total: int = arena.get_story_echo_positions().size()
-	if _story_echo_index >= total:
-		tutorial_step.text = "Todos os sinais foram investigados."
-	else:
-		tutorial_step.text = "Sinal %d de %d — procure o brilho adiante." % [_story_echo_index + 1, total]
-	tutorial_progress.value = (float(_story_echo_index) / maxf(float(total), 1.0)) * 100.0
-
-
-## Abre o primeiro portão somente depois que o pequeno arco de exploração foi concluído.
-func _finish_story_echoes() -> void:
-	var total: int = arena.get_story_echo_positions().size()
-	if _story_echo_index < total or _stage != EncounterStage.EXPLORE_ECHOES:
+func _check_path_encounter() -> void:
+	if _path_encounter_index >= 2 or _enemies_alive > 0:
 		return
-	_stage = EncounterStage.REACH_COMBAT
-	arena.open_tutorial_gate()
-	tutorial_title.text = "CAMINHO LIBERADO"
-	tutorial_step.text = "A Câmara dos Afogados está aberta."
-	tutorial_progress.value = 100.0
-	_set_objective("Entre na câmara e prepare-se para o confronto.")
-	get_tree().create_timer(1.8).timeout.connect(func() -> void:
-		if is_instance_valid(tutorial_panel):
-			tutorial_panel.visible = false
-	)
+	var reached := player.global_position.distance_to(arena.get_anchor_position("player_spawn")) > 520.0 if _path_encounter_index == 0 else player.global_position.distance_to(arena.get_story_echo_positions()[2]) < 720.0
+	if not reached:
+		return
+	var count := 2 if _path_encounter_index == 0 else 3
+	_path_encounter_index += 1
+	MusicDirector.set_context("waves")
+	for index in count:
+		_spawn_warned_enemy(_nearby_spawn(index, count), _enemy_profile("hunter" if index == 0 and count == 3 else "sailor"))
+	_notify("Afogados à vista • Shift para esquivar", Color("efb46b"))
+
+
+## Posições próximas, no piso e com rota aberta; não cria inimigos atrás de portões.
+func _nearby_spawn(index: int, total: int) -> Vector2:
+	for attempt in 24:
+		var angle := TAU * float(index) / maxf(total, 1.0) + float(attempt) * 0.48
+		var radius := 340.0 + float(attempt % 3) * 80.0
+		var candidate := player.global_position + Vector2.from_angle(angle) * radius
+		if not arena.is_walkable(candidate, 38.0):
+			continue
+		if arena.get_farthest_walkable_position(candidate, player.global_position, 20.0).distance_to(player.global_position) > 24.0:
+			continue
+		var occupied := false
+		for enemy in get_tree().get_nodes_in_group("enemies"):
+			if enemy.global_position.distance_to(candidate) < 95.0:
+				occupied = true
+		if not occupied:
+			return candidate
+	# Em corredores muito estreitos, usa a ponta de um trajeto aberto.
+	# Nunca recorre a um marcador distante atrás de um portão fechado.
+	var best := player.global_position
+	for attempt in 16:
+		var angle := TAU * float(index) / maxf(total, 1.0) + float(attempt) * 0.4
+		var candidate: Vector2 = arena.get_farthest_walkable_position(player.global_position, player.global_position + Vector2.from_angle(angle) * 480.0, 38.0)
+		if candidate.distance_squared_to(player.global_position) > best.distance_squared_to(player.global_position):
+			best = candidate
+	return best
+
+
+func _enemy_profile(kind: String) -> Dictionary:
+	var config := {"engaged": true, "max_health": 78.0, "move_speed": 135.0, "attack_damage": 12.0, "attack_windup": 0.38}
+	if kind == "hunter":
+		config.merge({"display_name": "Afogado Caçador", "can_charge": true, "max_health": 62.0, "move_speed": 172.0, "body_color": Color("b0dfd0"), "boss_dash_cooldown": 3.8, "boss_dash_speed": 480.0, "boss_dash_duration": 0.42, "boss_dash_telegraph_time": 0.65, "boss_dash_damage": 17.0}, true)
+	elif kind == "brute":
+		config.merge({"display_name": "Afogado Pesado", "max_health": 138.0, "move_speed": 112.0, "attack_damage": 22.0, "attack_range": 88.0, "attack_windup": 0.65, "attack_cooldown": 1.1, "body_color": Color("dec9ad"), "body_size": Vector2(48, 68)}, true)
+	return config
+
+
+func _spawn_warned_enemy(position: Vector2, config: Dictionary) -> void:
+	var enemy := _spawn_enemy(position, config)
+	enemy.set_active(false)
+	var ring := Line2D.new()
+	ring.width = 3.0
+	ring.default_color = Color("efb46b")
+	for index in 25:
+		ring.add_point(Vector2.from_angle(TAU * float(index) / 24.0) * 34.0)
+	add_child(ring)
+	ring.global_position = position
+	ring.z_index = 5
+	var label := Label.new()
+	label.text = enemy.display_name
+	label.position = Vector2(-78, -66)
+	label.size.x = 156
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 13)
+	label.add_theme_color_override("font_shadow_color", Color("081722"))
+	label.add_theme_constant_override("shadow_outline_size", 4)
+	ring.add_child(label)
+	enemy.defeated.connect(ring.queue_free, CONNECT_ONE_SHOT)
+	await get_tree().create_timer(0.7, false).timeout
+	if is_instance_valid(ring):
+		ring.queue_free()
+	if is_instance_valid(enemy) and not enemy._dead and not _round_finished:
+		enemy.set_active(true)
 
 
 ## Inicia uma sequência de ondas para dar peso à câmara sem despejar tudo ao mesmo tempo.
@@ -531,21 +624,24 @@ func _start_next_combat_wave() -> void:
 	if _stage != EncounterStage.COMBAT or _round_finished:
 		return
 	_wave_transition_pending = false
+	_feedback_time = 0.0
+	_feedback_label.hide()
 	_combat_wave += 1
 	if _combat_wave >= COMBAT_WAVE_SIZES.size():
 		_begin_boss_reveal()
 		return
-	var spawn_positions: Array[Vector2] = arena.get_mob_spawn_positions()
 	var wave_size: int = COMBAT_WAVE_SIZES[_combat_wave]
+	var patterns := [
+		["sailor", "sailor", "sailor", "hunter"],
+		["hunter", "sailor", "brute", "hunter", "sailor"],
+		["hunter", "brute", "sailor", "hunter", "brute", "sailor"],
+	]
 	for index in wave_size:
-		var spawn_index := (_combat_spawn_cursor + index) % spawn_positions.size()
-		_spawn_enemy(spawn_positions[spawn_index], {
-			"engaged": true,
-			"max_health": 88.0 + float(_combat_wave) * 14.0 + float(index % 3) * 8.0,
-			"move_speed": 96.0 + float(_combat_wave) * 8.0 + float(index % 2) * 10.0,
-		})
+		_spawn_warned_enemy(_nearby_spawn(index, wave_size), _enemy_profile(patterns[_combat_wave][index]))
 	_combat_spawn_cursor += wave_size
-	_set_objective("Sobreviva à onda %d de %d." % [_combat_wave + 1, COMBAT_WAVE_SIZES.size()])
+	var names := ["PRIMEIRO CONTATO", "CAÇADORES E PESADOS", "MARÉ ALTA"]
+	_set_stage_text("ONDA %d/3 • %s" % [_combat_wave + 1, names[_combat_wave]])
+	_set_objective("Derrote a onda %d/3. Caçadores investem; pesados deixam aberturas após o golpe." % (_combat_wave + 1))
 	_update_enemy_label()
 
 
@@ -553,15 +649,39 @@ func _queue_next_combat_wave() -> void:
 	if _wave_transition_pending:
 		return
 	_wave_transition_pending = true
-	_set_objective("A câmara se agita. A próxima onda está chegando...")
+	_reward_pending = true
+	player.health_component.heal(player.health_component.max_health * 0.12)
+	player.skill_cooldown_remaining = 0.0
+	player.set_controls_enabled(false)
+	_set_objective("Escolha uma melhoria antes da próxima onda.")
+	_reward_panel.present(_combat_wave + 1)
+
+
+func _choose_wave_reward(upgrade: String) -> void:
+	if not _reward_pending or _round_finished or not upgrade in ["power", "recharge", "vitality"]:
+		return
+	_reward_pending = false
+	_reward_panel.hide()
+	_upgrades.append(upgrade)
+	match upgrade:
+		"power": player.damage_multiplier *= 1.2
+		"recharge": player.skill_recharge_multiplier *= 0.8
+		"vitality":
+			var increase: float = player.health_component.max_health * 0.25
+			player.health_component.max_health += increase
+			player.health_component.heal(increase)
+	player.set_controls_enabled(true)
+	_set_objective("Melhoria recebida. A próxima onda chega em instantes.")
 	if skip_cinematics_for_tests:
 		call_deferred("_start_next_combat_wave")
 	else:
-		get_tree().create_timer(1.6).timeout.connect(_start_next_combat_wave)
+		get_tree().create_timer(1.0, false).timeout.connect(_start_next_combat_wave)
 
 
 func _begin_boss_reveal() -> void:
 	MusicDirector.set_context("cavern")
+	player.health_component.heal(player.health_component.max_health * 0.20)
+	player.skill_cooldown_remaining = 0.0
 	_stage = EncounterStage.BOSS_REVEAL
 	_run_boss_reveal(skip_cinematics_for_tests, skip_cinematics_for_tests)
 
@@ -574,7 +694,7 @@ func _spawn_enemy(spawn_position: Vector2, config: Dictionary = {}) -> Character
 		enemy.setup(config)
 	add_child(enemy)
 	enemy.global_position = spawn_position
-	enemy.defeated.connect(_on_enemy_defeated)
+	enemy.defeated.connect(_on_enemy_defeated.bind(enemy))
 	_enemies_alive += 1
 	return enemy
 
@@ -625,15 +745,15 @@ func _run_boss_reveal(skip_dialogue := false, instant := false) -> void:
 	else:
 		var reveal_tween := create_tween()
 		reveal_tween.set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_IN_OUT)
-		reveal_tween.tween_property(cutscene_camera, "global_position", _boss.global_position, 1.45)
+		reveal_tween.tween_property(cutscene_camera, "global_position", _boss.global_position, 0.85)
 		await reveal_tween.finished
-		await get_tree().create_timer(0.35).timeout
+		await get_tree().create_timer(0.2, false).timeout
 	if not skip_dialogue:
 		await DialogueManager.play(DIALOGUE_CATALOG.get_boss_reveal(GameState.selected_character_id))
 	if not instant:
 		var return_tween := create_tween()
 		return_tween.set_trans(Tween.TRANS_QUART).set_ease(Tween.EASE_IN_OUT)
-		return_tween.tween_property(cutscene_camera, "global_position", player.global_position, 1.1)
+		return_tween.tween_property(cutscene_camera, "global_position", player.global_position, 0.65)
 		await return_tween.finished
 	player.camera.enabled = true
 	cutscene_camera.enabled = false
@@ -760,7 +880,7 @@ func _refresh_action_prompt() -> void:
 			movement_prompt = "analógico esquerdo"
 			sprint_prompt = "botão de corrida"
 	action_label.text = "%s: %s" % [action_prompt, profile.action_name]
-	controls_label.text = "%s: mover  •  %s: correr  •  %s: ataque  •  Q / botão direito: especial  •  Esc: pausa  •  F11: tela cheia" % [movement_prompt, sprint_prompt, action_prompt]
+	controls_label.text = "%s: mover  •  %s: correr  •  %s: ataque  •  Q / botão direito: especial  •  Shift: esquiva  •  E: eco  •  Esc: pausa  •  F11: tela cheia" % [movement_prompt, sprint_prompt, action_prompt]
 
 
 ## Reinicia a recarga visual e registra o uso da habilidade no tutorial.
@@ -787,11 +907,23 @@ func _on_boss_health_changed(current: float, maximum: float) -> void:
 
 
 ## Entre ondas mantém o combate ativo; após o chefe apenas abre o caminho laranja.
-func _on_enemy_defeated() -> void:
+func _on_enemy_defeated(enemy: Node2D = null) -> void:
+	_defeats += 1
+	if is_instance_valid(enemy) and not enemy.is_miniboss and _defeats % 2 == 0 and not _round_finished:
+		var pickup := preload("res://scripts/gameplay/breath_pickup.gd").new()
+		pickup.player = player
+		pickup.arena = arena
+		add_child(pickup)
+		pickup.global_position = enemy.global_position
 	_enemies_alive = maxi(0, _enemies_alive - 1)
 	_update_enemy_label()
 	if _round_finished:
 		return
+	if _stage == EncounterStage.REACH_COMBAT and _enemies_alive == 0:
+		MusicDirector.set_context("cavern")
+		_notify("Caminho livre • recolha os brilhos verdes para recuperar fôlego", Color("83dfbe"))
+	elif _stage == EncounterStage.REACH_BOSS and _enemies_alive == 1:
+		MusicDirector.set_context("cavern")
 	if _stage == EncounterStage.COMBAT and _enemies_alive == 0:
 		_objective_completed("Onda %d de 3 vencida" % (_combat_wave + 1))
 		if _combat_wave + 1 < COMBAT_WAVE_SIZES.size():
@@ -858,7 +990,8 @@ func _finish_round(victory: bool) -> void:
 	tutorial_panel.visible = false
 	enemy_label.visible = false
 	result_title.text = "FIM DO PRÓLOGO" if victory else "VOCÊ SE AFOGOU"
-	result_detail.text = "A expedição segue além da gruta. Próxima fase em desenvolvimento." if victory else "Use tentar novamente para recomeçar a sequência."
+	result_detail.text = "%d:%02d • %d inimigos derrotados • %d melhorias\n%s" % [int(_run_time) / 60, int(_run_time) % 60, _defeats, _upgrades.size(), "A expedição segue além da gruta." if victory else "Desvie da faixa de investida e busque os brilhos verdes."]
+	_reward_panel.hide()
 	result_title.add_theme_color_override("font_color", Color("65d6a6") if victory else Color("e85d75"))
 	_set_stage_text("CONCLUÍDO" if victory else "DERROTA")
 	_set_objective("Prólogo concluído." if victory else "Recupere o fôlego e tente novamente.")
@@ -903,7 +1036,7 @@ func _on_return_title_pressed() -> void:
 
 func _refresh_skill_status() -> void:
 	var remaining: float = player.skill_cooldown_remaining
-	_skill_bar.value = 100.0 * (1.0 - remaining / float(player.profile.skill_cooldown))
+	_skill_bar.value = 100.0 * (1.0 - remaining / (float(player.profile.skill_cooldown) * player.skill_recharge_multiplier))
 	_skill_label.text = "Q · %s · %s" % [player.profile.skill_name, "PRONTA" if remaining == 0.0 else "%.1f s" % remaining]
 	_skill_label.add_theme_color_override("font_color", player.profile.color if remaining == 0.0 else Color("bdcbd4"))
 	_passive_label.text = player.get_passive_status()
@@ -922,3 +1055,44 @@ func _on_skill_rejected() -> void:
 
 func _on_passive_triggered(_passive_name: String) -> void:
 	FEEDBACK.pulse(_passive_label, player.profile.color)
+
+
+## Guia curto junto ao personagem: evita andar sem saber para onde seguir.
+func _draw() -> void:
+	if not is_instance_valid(player) or not player._controls_enabled or _round_finished or get_tree().paused:
+		return
+	var target := Vector2.INF
+	if _stage == EncounterStage.MOVEMENT_TUTORIAL or _stage == EncounterStage.REACH_COMBAT:
+		target = arena.get_anchor_position("combat_trigger")
+	elif _stage == EncounterStage.REACH_BOSS:
+		target = arena.get_anchor_position("boss_spawn")
+	elif _stage == EncounterStage.COMBAT:
+		var nearest := INF
+		for enemy in get_tree().get_nodes_in_group("enemies"):
+			var distance: float = player.global_position.distance_squared_to(enemy.global_position)
+			if distance < nearest:
+				nearest = distance
+				target = enemy.global_position
+	elif _stage == EncounterStage.REACH_EXIT:
+		if arena.has_exit_key() or arena.is_post_boss_gate_open():
+			target = arena.get_anchor_position("post_boss_exit")
+		else:
+			var nearest := INF
+			for position in arena.get_item_positions():
+				var distance: float = position.distance_squared_to(player.global_position)
+				if distance < nearest:
+					nearest = distance
+					target = position
+	if not target.is_finite() or player.global_position.distance_to(target) < 210.0:
+		return
+	if _guide_wait <= 0.0 or _guide_target.distance_squared_to(target) > 160.0 * 160.0:
+		_guide_wait = 0.5
+		_guide_target = target
+		_guide_path = arena.get_enemy_path(player.global_position, target, 26.0)
+	while not _guide_path.is_empty() and player.global_position.distance_to(_guide_path[0]) < 115.0:
+		_guide_path.remove_at(0)
+	var waypoint := _guide_path[0] if not _guide_path.is_empty() else target
+	var direction := player.global_position.direction_to(waypoint)
+	var center := to_local(player.global_position) + direction * 90.0
+	var side := direction.orthogonal()
+	draw_polyline(PackedVector2Array([center - direction * 9 + side * 8, center + direction * 5, center - direction * 9 - side * 8]), Color("83dfbe"), 3.0, true)

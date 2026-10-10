@@ -110,11 +110,10 @@ func _run() -> void:
 	assert(victory_lab._sprint_done)
 	victory_lab.player.call("_use_primary_action")
 	await process_frame
-	assert(victory_lab._action_done)
-	assert(not victory_lab.arena.is_tutorial_gate_open())
-	for echo_position in victory_lab.arena.get_story_echo_positions():
-		victory_lab.player.global_position = echo_position
-		await process_frame
+	assert(victory_lab.arena.is_tutorial_gate_open())
+	assert(victory_lab.arena.is_tutorial_gate_open())
+	victory_lab._path_encounter_index = 2
+	victory_lab.player.global_position = victory_lab.arena.get_anchor_position("combat_trigger")
 	assert(victory_lab.arena.is_tutorial_gate_open())
 
 	victory_lab._start_combat_encounter()
@@ -124,6 +123,9 @@ func _run() -> void:
 		for enemy in get_nodes_in_group("enemies"):
 			if enemy.get_parent() == victory_lab:
 				enemy.health_component.kill()
+		await process_frame
+		if victory_lab._reward_pending:
+			victory_lab._reward_panel._choose("power")
 		await process_frame
 		await process_frame
 	assert(victory_lab.arena.is_boss_gate_open())

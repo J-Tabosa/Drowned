@@ -46,6 +46,11 @@ var _steady_time := 0.0
 var _steady_ready := false
 var _dive_healed := false
 var _flow_time := 0.0
+var evade_cooldown := 0.0
+var _evade_time := 0.0
+var _evade_direction := Vector2.DOWN
+var damage_multiplier := 1.0
+var skill_recharge_multiplier := 1.0
 
 
 func _process(delta: float) -> void:
@@ -54,6 +59,7 @@ func _process(delta: float) -> void:
 	if not _controls_enabled:
 		return
 	skill_cooldown_remaining = maxf(0.0, skill_cooldown_remaining - delta)
+	evade_cooldown = maxf(0.0, evade_cooldown - delta)
 	_momentum_time = maxf(0.0, _momentum_time - delta)
 	_flow_time = maxf(0.0, _flow_time - delta)
 	if _momentum_time == 0.0:
@@ -118,6 +124,17 @@ func _physics_process(delta: float) -> void:
 		velocity = Vector2.ZERO
 		body.set_locomotion(false, false)
 		return
+	if Input.is_action_just_pressed("evade"):
+		_use_evade()
+	if _evade_time > 0.0:
+		_evade_time = maxf(0.0, _evade_time - delta)
+		var before := global_position
+		velocity = _evade_direction * 920.0
+		move_and_slide()
+		if is_instance_valid(_arena):
+			global_position = _arena.get_farthest_walkable_position(before, global_position, 26.0)
+		body.set_locomotion(true, true)
+		return
 
 	var input_vector := Input.get_vector("move_left", "move_right", "move_up", "move_down")
 	if input_vector.length_squared() > 0.01:
@@ -145,7 +162,7 @@ func _physics_process(delta: float) -> void:
 				break
 	body.set_locomotion(global_position.distance_squared_to(previous_position) > 1.0, Input.is_action_pressed("sprint"))
 
-	if Input.is_action_just_pressed("primary_action"):
+	if Input.is_action_pressed("primary_action") and _can_act and not _skill_busy:
 		_use_primary_action()
 	if Input.is_action_just_pressed("special_action"):
 		_use_special_action()
@@ -181,7 +198,20 @@ func _configure_camera() -> void:
 
 ## Bloqueia dano durante dash, mergulho ou após a morte.
 func can_receive_damage() -> bool:
-	return not _dead and not _dashing and not _diving
+	return not _dead and not _dashing and not _diving and _evade_time <= 0.0
+
+
+## Esquiva curta, sem dano: reposiciona todos os personagens sem atravessar paredes.
+func _use_evade() -> void:
+	if _dead or not _controls_enabled or evade_cooldown > 0.0 or _diving or _dashing or _skill_busy or body.is_action_playing():
+		return
+	var direction := Input.get_vector("move_left", "move_right", "move_up", "move_down")
+	_evade_direction = direction.normalized() if direction.length_squared() > 0.01 else facing
+	_evade_time = 0.18
+	evade_cooldown = 1.1
+	_knockback_velocity = Vector2.ZERO
+	FEEDBACK.burst(get_parent(), global_position, Color("80e5ec"))
+	FEEDBACK.sound(self, "swish")
 
 
 ## Calcula um impulso para longe da fonte do ataque recebido.
@@ -219,7 +249,7 @@ func is_sprinting() -> bool:
 func _use_primary_action() -> void:
 	if _dead or not _controls_enabled:
 		return
-	if not _can_act or _skill_busy:
+	if not _can_act or _skill_busy or _evade_time > 0.0:
 		action_rejected.emit()
 		return
 	_can_act = false
@@ -320,7 +350,7 @@ func _animate_dive() -> void:
 	global_position = target
 	body.jump_to_action_frame(4)
 	dive_hitbox.position = Vector2.ZERO
-	dive_hitbox.damage = float(profile.damage) * 1.35
+	dive_hitbox.damage = float(profile.damage) * damage_multiplier * 1.35
 	dive_hitbox.activate(0.18)
 	_create_dive_splash()
 	var return_tween := create_tween()
@@ -439,6 +469,7 @@ func _on_damaged(_amount: float, _source_position: Vector2) -> void:
 ## Interrompe controles, achata o placeholder e comunica a derrota à arena.
 func _on_died() -> void:
 	_dead = true
+	_evade_time = 0.0
 	_skill_busy = false
 	for hitbox in [melee_hitbox, dash_hitbox, dive_hitbox]:
 		hitbox.deactivate()
@@ -457,7 +488,7 @@ func _on_died() -> void:
 
 
 func _primary_damage() -> float:
-	return float(profile.damage) * (1.0 + 0.1 * _momentum)
+	return float(profile.damage) * damage_multiplier * (1.0 + 0.1 * _momentum)
 
 
 ## Passivas só respondem a dano confirmado, nunca a golpes no vazio.
@@ -490,7 +521,7 @@ func get_passive_status() -> String:
 
 func _fire_harpoon(direction: Vector2, damage: float, targets: int, origin: Vector2) -> void:
 	var projectile := PROJECTILE.instantiate()
-	projectile.setup(profile.color, direction, damage, 1480.0, 300.0)
+	projectile.setup(profile.color, direction, damage * damage_multiplier, 1480.0, 300.0)
 	projectile.pierce_count = targets
 	get_parent().add_child(projectile)
 	projectile.global_position = origin
@@ -500,10 +531,10 @@ func _fire_harpoon(direction: Vector2, damage: float, targets: int, origin: Vect
 func _use_special_action() -> void:
 	if _dead or not _controls_enabled:
 		return
-	if skill_cooldown_remaining > 0.0 or _skill_busy or _diving or _dashing or body.is_action_playing():
+	if skill_cooldown_remaining > 0.0 or _skill_busy or _diving or _dashing or _evade_time > 0.0 or body.is_action_playing():
 		skill_rejected.emit()
 		return
-	skill_cooldown_remaining = float(profile.skill_cooldown)
+	skill_cooldown_remaining = float(profile.skill_cooldown) * skill_recharge_multiplier
 	_skill_busy = true
 	skill_used.emit(profile.skill_name, skill_cooldown_remaining)
 	body.play_action(0.55)
@@ -577,7 +608,7 @@ func _damage_nearby(center: Vector2, radius: float, damage: float, pull: bool) -
 		if hurtbox == null:
 			continue
 		var source := enemy.global_position + (enemy.global_position - center) if pull else center
-		hurtbox.receive_hit(damage, source, 140.0 if pull else 520.0)
+		hurtbox.receive_hit(damage * damage_multiplier, source, 140.0 if pull else 520.0)
 
 
 func _skill_ring(center: Vector2, radius: float, tint: Color, duration: float, inward := false) -> void:

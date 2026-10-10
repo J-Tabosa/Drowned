@@ -28,6 +28,7 @@ const BOSS_SHEET := preload("res://assets/sprites/enemies/guardiao_abissal_sheet
 @onready var attack_hitbox: Area2D = %AttackHitbox
 
 var is_miniboss := false
+var can_charge := false
 var _target: Node2D
 var _can_attack := true
 var _dead := false
@@ -59,6 +60,7 @@ var _damage_tween: Tween
 func setup(config: Dictionary) -> void:
 	display_name = String(config.get("display_name", display_name))
 	is_miniboss = bool(config.get("is_miniboss", is_miniboss))
+	can_charge = bool(config.get("can_charge", false))
 	_aggro = bool(config.get("engaged", _aggro))
 	for property in ["move_speed", "attack_damage", "max_health", "aggro_range", "attack_range", "attack_cooldown", "boss_dash_cooldown", "boss_dash_speed", "boss_dash_duration", "boss_dash_telegraph_time", "boss_dash_damage"]:
 		set(property, float(config.get(property, get(property))))
@@ -116,7 +118,7 @@ func _physics_process(delta: float) -> void:
 	if _hurt_timer > 0.0:
 		_move_actor(_knockback_velocity, delta)
 		return
-	if _aggro and is_miniboss and _boss_dash_timer <= 0.0 and distance > attack_range * 1.3 and distance < 980.0 and _has_clear_route(_target.global_position):
+	if _aggro and (is_miniboss or can_charge) and _boss_dash_timer <= 0.0 and distance > attack_range * 1.3 and distance < 980.0 and _has_clear_route(_target.global_position):
 		_start_boss_dash(direction)
 		return
 	if _aggro and distance <= attack_range and _can_attack and _has_clear_route(_target.global_position):
@@ -138,7 +140,9 @@ func _apply_variant() -> void:
 	body.configure(BOSS_SHEET if is_miniboss else NORMAL_SHEET)
 	body.scale = Vector2.ONE * (1.5 if is_miniboss else 1.0)
 	body.position = Vector2(0, -8 if is_miniboss else -6)
-	body.modulate = Color.WHITE
+	body.modulate = body_color
+	if not is_miniboss:
+		body.scale *= body_size.y / 58.0
 	_radius = 38.0 if is_miniboss else 20.0
 	var shape := CircleShape2D.new()
 	shape.radius = _radius
@@ -236,7 +240,7 @@ func is_small_enemy() -> bool:
 func set_active(active: bool) -> void:
 	_active = active and not _dead
 	velocity = Vector2.ZERO
-	body.modulate = Color.WHITE if _active else Color(0.5, 0.6, 0.65, 0.8)
+	body.modulate = body_color if _active else Color(0.5, 0.6, 0.65, 0.8)
 	if not _active:
 		_cancel_attack()
 		body.set_locomotion(false)

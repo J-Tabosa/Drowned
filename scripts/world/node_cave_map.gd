@@ -68,7 +68,7 @@ func _ready() -> void:
 	_story_echo_anchors.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.x < b.x)
 	_story_echo_nodes.sort_custom(func(a: Polygon2D, b: Polygon2D) -> bool: return a.position.x < b.position.x)
 	for echo_index in _story_echo_nodes.size():
-		_story_echo_nodes[echo_index].visible = echo_index == 0
+		_story_echo_nodes[echo_index].visible = true
 	_build_boundary_walls()
 	_build_exit_gate_art()
 	_world_rect = Rect2(Vector2.ZERO, Vector2(_max_columns * TILE_STEP.x + 512, _map_rows.size() * TILE_STEP.y + 384))
@@ -482,12 +482,6 @@ func complete_story_echo(index: int) -> void:
 	fade.tween_property(echo, "scale", Vector2(1.7, 1.7), 0.24)
 	fade.tween_property(echo, "modulate:a", 0.0, 0.24)
 	fade.chain().tween_callback(echo.queue_free)
-	var next_index := index + 1
-	if next_index < _story_echo_nodes.size():
-		var next_echo := _story_echo_nodes[next_index]
-		next_echo.modulate.a = 0.0
-		next_echo.visible = true
-		next_echo.create_tween().tween_property(next_echo, "modulate:a", 1.0, 0.28)
 
 
 ## Expõe contagens do mapa para testes e ferramentas do editor.
@@ -542,7 +536,7 @@ func get_nearby_closed_gate(world_position: Vector2) -> String:
 
 func get_gate_hint(gate_id: String) -> String:
 	match gate_id:
-		"tutorial": return "Portão selado: conclua o treino e investigue os três ecos."
+		"tutorial": return "Portão selado: mova-se para aprender os controles."
 		"boss": return "Portão selado: derrote as três ondas de Afogados."
 		"post_boss":
 			if not _boss_defeated:
