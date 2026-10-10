@@ -1,5 +1,10 @@
 extends Node
 
+signal progression_changed(character_id: String)
+const SKILLS := preload("res://scripts/gameplay/skill_catalog.gd")
+const PROGRESSION_FILE := "user://progression.cfg"
+var _progression: Dictionary = {}
+
 const CHARACTER_PROFILES: Array[Dictionary] = [
 	{
 		"id": "breaker",
@@ -33,12 +38,12 @@ const CHARACTER_PROFILES: Array[Dictionary] = [
 		"portrait": "res://assets/sprites/characters/vigia_source.png",
 		"speed": 265.0,
 		"max_health": 100.0,
-		"damage": 44.0,
+		"damage": 32.0,
 		"action": "shoot",
 		"action_name": "Disparo de Arpão",
-		"cooldown": 0.68,
+		"cooldown": 0.78,
 		"passive_name": "Mira Firme",
-		"passive_description": "Pare por 0,9 s: o próximo arpão ganha +40% de dano e perfura 2 alvos.",
+		"passive_description": "Pare por 1,2 s: o próximo arpão ganha +25% de dano e perfura 2 alvos.",
 		"skill_name": "Salva de Arpões",
 		"skill_description": "Dispara 5 arpões em leque que atravessam até 3 alvos cada.",
 		"skill_cooldown": 6.0,
@@ -90,6 +95,7 @@ func _ready() -> void:
 	var config := ConfigFile.new()
 	if config.load("user://preferences.cfg") == OK:
 		dialogue_speed_index = clampi(int(config.get_value("dialogue", "speed", 1)), 0, 3)
+	_load_progression()
 
 func set_dialogue_speed(index: int) -> void:
 	dialogue_speed_index = clampi(index, 0, 3)
@@ -100,3 +106,72 @@ func set_dialogue_speed(index: int) -> void:
 
 func get_dialogue_speed() -> float:
 	return DIALOGUE_SPEEDS[dialogue_speed_index]
+
+
+func _valid_character(character_id: String) -> bool:
+	for profile in CHARACTER_PROFILES:
+		if profile.id == character_id:
+			return true
+	return false
+
+
+func _load_progression() -> void:
+	var config := ConfigFile.new()
+	config.load(PROGRESSION_FILE)
+	_progression.clear()
+	for profile in CHARACTER_PROFILES:
+		var learned: Array[String] = []
+		for skill_id in config.get_value(profile.id, "learned", []):
+			if skill_id is String and not SKILLS.find_skill(profile.id, skill_id).is_empty() and not learned.has(skill_id):
+				learned.append(skill_id)
+		_progression[profile.id] = {"xp": maxi(0, int(config.get_value(profile.id, "xp", 0))), "learned": learned}
+
+
+func _save_progression() -> void:
+	var config := ConfigFile.new()
+	for character_id in _progression:
+		config.set_value(character_id, "xp", _progression[character_id].xp)
+		config.set_value(character_id, "learned", _progression[character_id].learned)
+	config.save(PROGRESSION_FILE)
+
+
+func get_skill_xp(character_id: String) -> int:
+	return int(_progression.get(character_id, {}).get("xp", 0))
+
+
+func get_learned_skills(character_id: String) -> Array:
+	return _progression.get(character_id, {}).get("learned", []).duplicate()
+
+
+func has_skill(character_id: String, skill_id: String) -> bool:
+	return get_learned_skills(character_id).has(skill_id)
+
+
+## Only the prologue boss reward is admitted here; ordinary enemies grant breath.
+func collect_boss_xp(character_id: String, amount: int, boss_id: String) -> bool:
+	if boss_id != "guardian_prologue" or not _valid_character(character_id) or amount <= 0 or amount > 100:
+		return false
+	_progression[character_id].xp += amount
+	_save_progression()
+	progression_changed.emit(character_id)
+	return true
+
+
+func can_learn_skill(character_id: String, skill_id: String) -> bool:
+	if not _valid_character(character_id) or has_skill(character_id, skill_id):
+		return false
+	var skill := SKILLS.find_skill(character_id, skill_id)
+	if skill.is_empty():
+		return false
+	return get_skill_xp(character_id) >= skill.cost and (skill.requires.is_empty() or has_skill(character_id, skill.requires))
+
+
+func learn_skill(character_id: String, skill_id: String) -> bool:
+	if not can_learn_skill(character_id, skill_id):
+		return false
+	var skill := SKILLS.find_skill(character_id, skill_id)
+	_progression[character_id].xp -= int(skill.cost)
+	_progression[character_id].learned.append(skill_id)
+	_save_progression()
+	progression_changed.emit(character_id)
+	return true

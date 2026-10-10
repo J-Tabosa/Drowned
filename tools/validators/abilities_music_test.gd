@@ -57,7 +57,7 @@ func _run() -> void:
 				player._use_special_action()
 				assert(player.skill_cooldown_remaining == 0.0)
 			"sharpshooter":
-				await create_timer(1.0).timeout
+				await create_timer(1.3).timeout
 				assert(player._steady_ready)
 				direction = player._get_cursor_direction(player.facing)
 				var muzzle: Vector2 = player.body.to_global(Vector2(-52.0 if direction.x < -0.08 else 52.0, -14.0))
@@ -68,8 +68,8 @@ func _run() -> void:
 				player._use_primary_action()
 				assert(not player._steady_ready)
 				await create_timer(0.55).timeout
-				assert(is_equal_approx(first.health_component.current_health, 938.4))
-				assert(is_equal_approx(second.health_component.current_health, 938.4), "Aimed harpoon must pierce")
+				assert(is_equal_approx(first.health_component.current_health, 960.0))
+				assert(is_equal_approx(second.health_component.current_health, 960.0), "Aimed harpoon must pierce")
 				player._use_special_action()
 				await create_timer(0.23).timeout
 				var harpoons: Array[Node] = lab.find_children("*", "Area2D", false, false)

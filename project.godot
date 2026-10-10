@@ -92,6 +92,11 @@ interact={
 "events": [Object(InputEventKey,"physical_keycode":69)
 ]
 }
+skill_tree={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":4194306)
+]
+}
 
 [physics]
 

@@ -72,7 +72,7 @@ func _run() -> void:
 	for enemy in get_nodes_in_group("enemies"):
 		assert(not enemy._active)
 	lab._toggle_pause()
-	await create_timer(0.75, false).timeout
+	await create_timer(1.0, false).timeout
 	for enemy in get_nodes_in_group("enemies"):
 		assert(enemy._active)
 		enemy.health_component.kill()
@@ -93,7 +93,8 @@ func _run() -> void:
 	await process_frame
 	assert(lab.player.health_component.current_health == health + 5.0)
 	assert(lab.player.skill_cooldown_remaining < 3.3)
-	# Ondas perto do jogador, variantes distintas, melhoria só uma vez.
+	# Waves progress without a reward popup; normal enemies never grant skill XP.
+	var xp_before: int = state.get_skill_xp("breaker")
 	lab.player.global_position = lab.arena.get_anchor_position("combat_trigger")
 	lab.player.camera.reset_smoothing()
 	lab._start_combat_encounter()
@@ -117,27 +118,13 @@ func _run() -> void:
 		for enemy in get_nodes_in_group("enemies"):
 			enemy.health_component.kill()
 		await process_frame
-		if wave < 2:
-			assert(lab._reward_panel.visible and lab._reward_pending)
-			assert(not lab.player._controls_enabled)
-			if OS.get_environment("DROWNED_RHYTHM_CAPTURE") == "1":
-				await process_frame
-				await process_frame
-				DirAccess.make_dir_recursive_absolute("res://.godot/rhythm_review")
-				root.get_texture().get_image().save_png("res://.godot/rhythm_review/reward_%d.png" % wave)
-			lab._toggle_pause()
-			lab._reward_panel._choose("power")
-			assert(lab._reward_pending)
-			lab._toggle_pause()
-			lab._reward_panel._choose("power" if wave == 0 else "vitality")
-			assert(lab.player._controls_enabled)
-			var multiplier: float = lab.player.damage_multiplier
-			lab._choose_wave_reward("power")
-			assert(lab.player.damage_multiplier == multiplier)
-			await process_frame
-			await process_frame
-	assert(is_equal_approx(lab.player.damage_multiplier, 1.2))
-	assert(is_equal_approx(lab.player.health_component.max_health, 175.0))
+		assert(lab.player._controls_enabled)
+		assert(not lab._skill_tree.visible)
+		assert(state.get_skill_xp("breaker") == xp_before)
+		await process_frame
+		await process_frame
+	assert(is_equal_approx(lab.player.damage_multiplier, 1.0))
+	assert(is_equal_approx(lab.player.health_component.max_health, 140.0))
 	assert(lab._boss != null)
 	assert(lab._stage == lab.EncounterStage.REACH_BOSS)
 	lab.player.global_position = lab.arena.get_anchor_position("boss_spawn") + Vector2(-1800, 0)
@@ -161,6 +148,9 @@ func _run() -> void:
 	lab._boss.health_component.kill()
 	await process_frame
 	assert(lab._stage == lab.EncounterStage.REACH_EXIT)
+	assert(state.get_skill_xp("breaker") == xp_before + 100)
+	state._progression.breaker.xp = xp_before
+	state._save_progression()
 	assert(not lab.arena.open_post_boss_gate(), "Chefe não elimina a exigência da chave")
 	lab.queue_free()
 	await process_frame

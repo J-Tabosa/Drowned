@@ -80,11 +80,11 @@ func _run() -> void:
 						wind_found = true
 				assert(wind_found)
 			elif profile.id == "sharpshooter":
-				assert(is_equal_approx(float(profile.cooldown), 0.68))
+				assert(is_equal_approx(float(profile.cooldown), 0.78))
 				await create_timer(0.255, false).timeout
 				var projectile: Variant = lab.get_node_or_null("PlaceholderProjectile")
 				assert(is_instance_valid(projectile))
-				assert(is_equal_approx(projectile.speed, 1480.0))
+				assert(is_equal_approx(projectile.speed, 1160.0))
 				var muzzle := Vector2(-52.0 if lab.player.body.flip_h else 52.0, -14.0)
 				assert(projectile.global_position.distance_to(lab.player.body.to_global(muzzle)) < 65.0)
 
@@ -124,14 +124,12 @@ func _run() -> void:
 			if enemy.get_parent() == victory_lab:
 				enemy.health_component.kill()
 		await process_frame
-		if victory_lab._reward_pending:
-			victory_lab._reward_panel._choose("power")
 		await process_frame
 		await process_frame
 	assert(victory_lab.arena.is_boss_gate_open())
 	assert(root.get_node("MusicDirector").context == "cavern")
 	assert(is_instance_valid(victory_lab._boss))
-	assert(victory_lab._boss.health_component.max_health == 700.0)
+	assert(victory_lab._boss.health_component.max_health == 1100.0)
 	assert(not victory_lab._boss.can_receive_damage())
 
 	victory_lab._begin_boss_fight(true)

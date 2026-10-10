@@ -1,6 +1,6 @@
 # Ritmo do prólogo
 
-A partida alterna pequenos confrontos no caminho, três ondas com composição distinta, escolha de melhorias e o Guardião. Movimento abre a primeira passagem após 220 unidades; corrida, ataque e os três ecos deixam de ser requisitos para prosseguir. A narrativa inicial e a apresentação do chefe continuam no fluxo.
+A partida alterna pequenos confrontos no caminho, três ondas com composição distinta e o Guardião. Movimento abre a primeira passagem após 220 unidades; corrida, ataque e os três ecos deixam de ser requisitos para prosseguir. A narrativa inicial e a apresentação do chefe continuam no fluxo. Em 9/10/2026, as escolhas entre ondas foram movidas para árvores permanentes por personagem; Tab abre a árvore e só o primeiro boss concede XP. Veja [skill_trees_and_boss.md](skill_trees_and_boss.md).
 
 ## Controles e decisões
 
@@ -11,7 +11,7 @@ A partida alterna pequenos confrontos no caminho, três ondas com composição d
 
 ## Encontros e recompensas
 
-Duas emboscadas curtas ocupam o caminho até a câmara, e uma pequena guarda intercepta a aproximação ao fosso do chefe. Os inimigos da câmara aparecem perto do jogador, em piso aberto, com aviso de 0,7 s que congela na pausa. As ondas têm 4, 5 e 6 inimigos:
+Duas emboscadas curtas ocupam o caminho até a câmara, e uma pequena guarda intercepta a aproximação ao fosso do chefe. Os inimigos da câmara aparecem perto do jogador, em piso aberto, saindo do chão em 0,9 s, com lama e revelação progressiva do sprite. A emergência congela na pausa e não usa nomes nem círculos. As ondas têm 4, 5 e 6 inimigos:
 
 | Inimigo | Comportamento | Resposta do jogador |
 | --- | --- | --- |
@@ -19,15 +19,10 @@ Duas emboscadas curtas ocupam o caminho até a câmara, e uma pequena guarda int
 | Caçador | Mais rápido, menos vida, investida com faixa de aviso | Esquivar lateralmente; golpes interrompem a preparação |
 | Pesado | Mais vida, movimento lento, golpe forte com antecipação longa | Aproveitar a abertura após o golpe; juntar alvos para o especial |
 
-A cada dois inimigos comuns derrotados cai um brilho verde. Recolher a até 58 unidades recupera 5 de vida e reduz a recarga do especial em 0,8 s. Expira após 14 s e respeita paredes e pausa: é preciso buscar a posição do inimigo derrotado.
+A cada dois inimigos comuns derrotados cai um orbe verde de fôlego. Ele é atraído dentro de 260 unidades, com rastro de partículas; respeita paredes, navegação e pausa. Ao chegar ao jogador, recupera 5 de vida e reduz a recarga do especial em 0,8 s. Expira após 24 s. Não concede XP de habilidade.
 
-Após as duas primeiras ondas, o jogador recupera 12% de vida e o especial fica pronto. A próxima onda aguarda uma escolha:
-
-- Primeira recompensa: +20% de dano em ataques e especiais **ou** especial com recarga 20% menor.
-- Segunda recompensa: +20% de dano **ou** +25% de vida máxima com cura equivalente ao aumento.
-
-As melhorias acumulam apenas durante a partida; reiniciar restaura os atributos. Ao terminar a terceira onda, 20% de vida são recuperados e o especial fica pronto para o chefe. A revelação usa movimentos de câmera mais curtos. O resultado registra tempo jogado, inimigos derrotados e melhorias escolhidas. O Guardião continua exigindo uma chave-bússola para abrir a saída.
+Após as duas primeiras ondas, o jogador recupera 12% de vida e o especial fica pronto. A próxima onda começa após uma breve pausa, sem menu obrigatório. As melhorias anteriores (+20% dano, -20% recarga e +25% vida) permanecem nos nós das árvores, compradas com XP e salvas entre partidas. Ao terminar a terceira onda, 20% de vida são recuperados e o especial fica pronto para o chefe. O resultado registra tempo, inimigos derrotados e habilidades aprendidas. O Guardião concede 100 XP, mas continua exigindo uma chave-bússola para abrir a saída.
 
 ## Verificação
 
-`tools/validators/gameplay_rhythm_test.gd` cobre esquiva nos três perfis, dano bloqueado, portões, recarga e pausa, ataque mantido, avanço sem ecos obrigatórios, emboscadas, avisos pausáveis, coleta, composição das ondas, escolhas sem duplicação e transição até a saída. `combat_smoke_test_v2.gd` mantém a regressão do prólogo completo. Capturas das escolhas: execute o teste com renderer e `DROWNED_RHYTHM_CAPTURE=1`; saída em `.godot/rhythm_review/`.
+`tools/validators/gameplay_rhythm_test.gd` cobre esquiva, portões, pausa, ataque mantido, ecos opcionais, emboscadas, emergência pausável, coleta, composição das ondas sem popup e XP do boss. `combat_smoke_test_v2.gd` mantém a regressão do prólogo completo. As capturas novas da árvore e do boss são geradas por `progression_visual_check.gd` em `.godot/progression_review/`.

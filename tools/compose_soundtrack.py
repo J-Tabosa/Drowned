@@ -1,7 +1,6 @@
-"""Compose Drowned's original 72 BPM score; requires NumPy, no sample downloads.
+"""Original dark 72 BPM score: sub-bass cave, heavy drums, distorted boss guitar.
 
-Three phase-aligned stereo stems, 16 bars in D minor. Circular rendering keeps
-pad/reverb tails continuous at the loop boundary. Run from any directory.
+No downloaded samples. Three aligned 16-bar PCM loops; requires NumPy.
 """
 from pathlib import Path
 import json
@@ -26,86 +25,83 @@ def add(stem, sound, start, gain, pan=0.0):
     stem[indices, 1] += sound * gain * np.sqrt((1 + pan) / 2)
 
 
-def pad(note, duration):
-    t = np.arange(round(duration * RATE)) / RATE
-    env = np.minimum(t / 1.4, 1) * np.minimum((duration - t) / 1.8, 1)
-    f = hz(note)
-    return env * (np.sin(2 * np.pi * f * t)
-                  + 0.32 * np.sin(2 * np.pi * f * 1.002 * t)
-                  + 0.12 * np.sin(4 * np.pi * f * t)) / 1.44
-
-
-def bell(note, duration=3.2):
-    t = np.arange(round(duration * RATE)) / RATE
-    return np.minimum(t / 0.035, 1) * np.exp(-t * 1.5) * (
-        np.sin(2 * np.pi * hz(note) * t)
-        + 0.16 * np.sin(2 * np.pi * hz(note) * 2.01 * t))
-
-
 def bass(note, duration):
-    # Slow sub-bass pulses with audible overtones add tension under the pads.
     t = np.arange(round(duration * RATE)) / RATE
-    f = hz(note)
-    envelope = np.minimum(t / 0.12, 1) * np.exp(-t * 0.55)
-    envelope *= np.minimum((duration - t) / 0.28, 1)
-    tone = np.sin(2 * np.pi * f * t) + 0.40 * np.sin(4 * np.pi * f * t)
-    tone += 0.16 * np.sin(6 * np.pi * f * t)
-    return np.tanh(tone * 1.15) * envelope * (0.88 + 0.12 * np.sin(2 * np.pi * 0.7 * t))
+    phase = 2 * np.pi * hz(note) * t
+    tone = np.sin(phase) + 0.45 * np.sin(phase * 2) + 0.20 * np.sin(phase * 3)
+    envelope = np.minimum(t / 0.07, 1) * np.minimum((duration - t) / 0.25, 1)
+    return np.tanh(tone * 1.3) * envelope * np.exp(-t * 0.45)
 
 
-def drum(frequency, duration, noise=0.08):
+def drone(note, duration):
     t = np.arange(round(duration * RATE)) / RATE
-    phase = 2 * np.pi * frequency * (t + 0.025 * (1 - np.exp(-t * 45)))
-    return np.minimum(t / 0.003, 1) * np.exp(-t * 9) * (
-        np.sin(phase) + noise * RNG.uniform(-1, 1, len(t)))
+    envelope = np.minimum(t / 1.7, 1) * np.minimum((duration - t) / 2, 1)
+    phase = 2 * np.pi * hz(note) * t
+    return envelope * (np.sin(phase) + 0.3 * np.sin(phase * 1.003)) / 1.3
 
 
-def guitar(note, duration=1.5):
-    # Karplus–Strong plucked string, gently saturated for the boss room.
-    size = round(RATE / hz(note) - 0.5)
-    excitation = RNG.uniform(-1, 1, size)
-    excitation -= excitation.mean()
-    sound = np.zeros(round(duration * RATE))
-    sound[:size] = excitation
-    for i in range(size, len(sound)):
-        sound[i] = 0.497 * (sound[i - size] + sound[i - size + 1])
-    t = np.arange(len(sound)) / RATE
-    return np.tanh(sound * 2.0) * np.minimum(t / 0.004, 1) * np.exp(-t * 0.7)
+def kick(duration=0.65):
+    t = np.arange(round(duration * RATE)) / RATE
+    phase = 2 * np.pi * (48 * t + 1.8 * (1 - np.exp(-t * 35)))
+    return np.minimum(t / 0.003, 1) * np.exp(-t * 8) * np.sin(phase)
+
+
+def snare(duration=0.28):
+    t = np.arange(round(duration * RATE)) / RATE
+    noise = RNG.uniform(-1, 1, len(t))
+    return np.minimum(t / 0.002, 1) * np.exp(-t * 18) * (
+        noise * 0.65 + np.sin(2 * np.pi * 155 * t) * 0.30)
+
+
+def rock_string(note, duration, muted=True):
+    t = np.arange(round(duration * RATE)) / RATE
+    phase = 2 * np.pi * hz(note) * t
+    # Picked harmonics into distortion: low electric string rather than a bell.
+    clean = sum(np.sin(phase * harmonic) / harmonic ** 1.15 for harmonic in range(1, 13))
+    clean += 0.12 * RNG.uniform(-1, 1, len(t)) * np.exp(-t * 65)
+    distorted = np.tanh(clean * 3.8)
+    # Cabinet tone rolls off fizz while retaining the power-chord harmonics.
+    cabinet = np.zeros_like(distorted)
+    for i in range(1, len(cabinet)):
+        cabinet[i] = cabinet[i - 1] + 0.32 * (distorted[i] - cabinet[i - 1])
+    envelope = np.minimum(t / 0.006, 1) * np.minimum((duration - t) / 0.055, 1)
+    envelope *= np.exp(-t * (7.0 if muted else 1.8))
+    return cabinet * envelope
 
 
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     stems = {name: np.zeros((LENGTH, 2)) for name in ["cavern", "waves_drums", "boss_guitar"]}
-    chords = [(50, 57, 62, 65), (46, 53, 58, 62), (48, 53, 57, 60), (48, 55, 60, 64)]
-    melody = [74, 69, 65, 67, 70, 65, 62, 65, 69, 72, 69, 65, 67, 64, 67, 69]
+    # Pedal in D with sparse minor/tritone tension; no bright melodic arpeggio.
+    riff = [38, 38, None, 38, 41, 38, 36, 37]
     for bar in range(16):
         start = bar * 4 * BEAT
-        chord = chords[(bar // 2) % 4]
-        for voice, note in enumerate(chord):
-            add(stems["cavern"], pad(note, 4 * BEAT + 2.2), start - 1.1, 0.105, (voice - 1.5) * 0.32)
-        add(stems["cavern"], bell(melody[bar]), start + BEAT, 0.13, (-1 if bar % 2 else 1) * 0.45)
-        add(stems["cavern"], bell(melody[bar] - 12), start + 3 * BEAT, 0.07, 0.2)
+        root = 26 if bar % 8 < 6 else 25
         for beat in [0, 2]:
-            add(stems["cavern"], bass(chord[0] - 24, 2 * BEAT + 0.2), start + beat * BEAT, 0.20)
-        for beat in range(4):
-            add(stems["waves_drums"], drum(62 if beat % 2 == 0 else 104, 0.55), start + beat * BEAT,
-                0.42 if beat == 0 else 0.24, -0.2 if beat % 2 else 0.15)
-            if beat in (1, 3):
-                add(stems["waves_drums"], drum(148, 0.28, 0.3), start + (beat + 0.5) * BEAT, 0.14, 0.4)
-        # Picked arpeggio and a low string establish the guitar without drowning dialogue.
-        add(stems["boss_guitar"], guitar(chord[0] - 12, 2.8), start, 0.3, -0.15)
-        for pick in range(8):
-            note = chord[[1, 2, 3, 2, 1, 3, 2, 1][pick]] + 12
-            sound = guitar(note)
+            add(stems["cavern"], bass(root, 2.2 * BEAT), start + beat * BEAT, 0.35)
+        add(stems["cavern"], drone(38, 6 * BEAT), start - BEAT, 0.10, -0.25)
+        add(stems["cavern"], drone(45 if bar % 4 < 3 else 44, 6 * BEAT), start - BEAT, 0.045, 0.3)
+        if bar % 4 == 3:
+            add(stems["cavern"], drone(51, 4 * BEAT), start, 0.025, 0.5)
+        for beat in [0, 2, 2.75]:
+            add(stems["waves_drums"], kick(), start + beat * BEAT, 0.48 if beat != 2.75 else 0.22)
+        for beat in [1, 3]:
+            add(stems["waves_drums"], snare(), start + beat * BEAT, 0.30, 0.12)
+        for pick, note in enumerate(riff):
+            if note is None:
+                continue
             when = start + pick * BEAT / 2
-            add(stems["boss_guitar"], sound, when, 0.28, -0.35)
-            add(stems["boss_guitar"], sound, when + BEAT * 0.75, 0.08, 0.65)
-    # Circular delays for an underwater space, including notes across the seam.
+            muted = pick != 4
+            duration = BEAT * (0.46 if muted else 0.9)
+            for string, pitch in enumerate([note, note + 7, note + 12]):
+                gain = [0.19, 0.12, 0.07][string]
+                add(stems["boss_guitar"], rock_string(pitch, duration, muted), when, gain, -0.4)
+                add(stems["boss_guitar"], rock_string(pitch, duration, muted),
+                    when + 0.012, gain * 0.8, 0.4)
     base = stems["cavern"]
-    base += np.roll(base.copy(), round(BEAT * 1.5 * RATE), axis=0) * 0.18
+    base += np.roll(base.copy(), round(BEAT * 1.5 * RATE), axis=0) * 0.12
     stats = {}
     for name, stem in stems.items():
-        # Remove the last-to-first sample jump with a short, smooth correction.
         taper = (0.5 + 0.5 * np.cos(np.linspace(0, np.pi, 256)))[:, None]
         stem[:256] -= taper * (stem[0] - stem[-1])
         peak = float(np.abs(stem).max())

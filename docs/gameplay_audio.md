@@ -1,6 +1,6 @@
 # Passivas, habilidades e trilha dinâmica
 
-Atualização de 6 de outubro de 2026. Integra as duas melhorias de interface
+Atualização de 9 de outubro de 2026. Integra as duas melhorias de interface
 do GitHub (`5890303`) com os inimigos animados, navegação e feedback locais.
 O merge conserva ambos os históricos; o conflito do HUD foi resolvido mantendo
 o layout compacto, as missões recolhíveis e os avisos de combate.
@@ -12,6 +12,7 @@ o layout compacto, as missões recolhíveis e os avisos de combate.
 - Shift: esquiva curta. E: investigar ecos opcionais. Veja [`gameplay_rhythm.md`](gameplay_rhythm.md).
 - **Q / botão direito: habilidade especial**, com recarga independente.
 - Esc: pausa. Configurações: volume da música, névoa e velocidade dos diálogos.
+- Tab: árvore de habilidades do personagem; evolução permanente por XP do boss.
 - Passe o cursor sobre a passiva ou especial na seleção e no HUD para ler os efeitos.
 
 ## Personagens
@@ -19,7 +20,7 @@ o layout compacto, as missões recolhíveis e os avisos de combate.
 | Personagem | Passiva | Especial |
 | --- | --- | --- |
 | Quebra-Mar | **Maré de Ferro**: cada acerto de âncora adiciona uma carga de +10% de dano, até 3. As cargas duram 8 s desde o último acerto. Golpes no vazio não geram cargas. | **Âncora Giratória**: atinge inimigos num raio de 210, causando 90 de dano +15 por carga consumida, com forte recuo. Recarga: 7 s. |
-| Vigia | **Mira Firme**: ficar parada por 0,9 s prepara o próximo ataque normal para +40% de dano e perfuração de 2 alvos. Movimento ou recuo cancela a preparação. | **Salva de Arpões**: 5 disparos em leque, 36 de dano cada; cada arpão atravessa até 3 alvos, acertando cada alvo apenas uma vez. Recarga: 6 s. |
+| Vigia | **Mira Firme**: ficar parada por 1,2 s prepara o próximo ataque normal para +25% de dano e perfuração de 2 alvos. Movimento ou recuo cancela a preparação. | **Salva de Arpões**: 5 disparos em leque, 22 de dano cada; cada arpão atravessa até 3 alvos, acertando cada alvo apenas uma vez. Recarga: 6 s. |
 | Mergulhador | **Segundo Fôlego**: acertar o retorno de um mergulho cura 6 de vida e concede +20% de velocidade por 2 s. A cura ocorre uma vez por mergulho, mesmo atingindo vários inimigos. | **Correnteza Abissal**: cria uma área no cursor, até 360 de distância; 5 pulsos espaçados em 0,65 s atingem um raio de 210, causando 16 de dano por pulso e puxando os inimigos. Recarga: 8 s. |
 
 Ataques em área e arpões respeitam paredes e portões fechados. A habilidade não
@@ -33,9 +34,9 @@ Composição instrumental original feita para o projeto, sem samples ou músicas
 externas: **72 BPM, ré menor, 16 compassos, loop estéreo de 53,33 segundos**.
 As três camadas começam juntas e permanecem sincronizadas:
 
-- `assets/audio/music/cavern.wav`: acordes suaves, notas espaçadas, ecos e pulsos lentos de baixo nas cavernas, título, seleção e diálogos.
-- `assets/audio/music/waves_drums.wav`: tambores graves entram no início das ondas e permanecem entre elas.
-- `assets/audio/music/boss_guitar.wav`: guitarra de corda pinçada, sintetizada por Karplus–Strong, entra ao acessar a sala do Guardião, junto dos tambores.
+- `assets/audio/music/cavern.wav`: sub-baixo lento e drones graves com tensão cromática, sem sinos ou arpejos agudos, nas cavernas, título, seleção e diálogos.
+- `assets/audio/music/waves_drums.wav`: bumbo pesado e caixa entram no início dos confrontos.
+- `assets/audio/music/boss_guitar.wav`: riff grave de guitarra elétrica sintetizada, com distorção, abafamento e power chords; entra junto de bateria mais presente na sala do Guardião.
 
 As transições duram 1,5 s. Depois das ondas, a revelação retorna ao ambiente
 calmo; ao entrar na sala do chefe, a guitarra entra antes da apresentação.
@@ -43,7 +44,7 @@ Derrota, vitória, saída após o chefe e retorno à seleção restauram a base 
 O volume persiste em `user://preferences.cfg`; zero silencia todas as camadas.
 A música continua nos diálogos enquanto o combate está pausado; o menu de
 pausa suspende o áudio. O baixo usa notas fundamentais profundas e harmônicos
-audíveis para acrescentar tensão sem encobrir a melodia.
+audíveis para criar tensão. No boss, o mix reduz o drone e destaca guitarra e bateria.
 
 Para recriar os WAVs: `python tools/compose_soundtrack.py` (requer NumPy).
 Os WAVs e suas configurações de importação estão incluídos no repositório;

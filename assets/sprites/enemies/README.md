@@ -1,5 +1,18 @@
 # Afogados e Guardião Abissal
 
+## Revisão de 9/10/2026
+
+O combate usa agora `afogado_pesado_sheet_64.png` para o Pesado (escala 1,6)
+e `colosso_afogado_sheet_64.png` para o Guardião (escala 3), com sprites
+distintos do afogado comum. As versões de 96 pixels também são exportadas.
+O novo boss é um monstro de braços longos, mandíbula de rugido e costas rochosas,
+com animações completas de repouso, caminhada, ataque, dano e morte.
+Fontes RGBA e prompts de geração/extração de fundo pela ferramenta ImageGen
+integrada estão em [enemy_art_generation.json](../../../docs/enemy_art_generation.json).
+As folhas antigas do Guardião abaixo permanecem como histórico de arte.
+
+## Folhas originais (histórico)
+
 Folhas geradas com a ferramenta de imagens integrada (skill imagegen), usando
 Mergulhador e Quebra-Mar como referências visuais. O Guardião usa também o Afogado
 como referência: mesma espécie, roupa e paleta; ombros, braços e tronco mais fortes.
@@ -13,8 +26,8 @@ Cada atlas possui **6 colunas × 5 linhas**, com seis poses por animação:
 5. Morte, terminando no corpo caído.
 
 Os PNGs têm transparência real e versões de **64×64 e 96×96 por quadro**.
-O jogo usa a versão de 96 px, como os personagens atuais; o Afogado fica em
-escala 1 e o Guardião em 1,5. A versão de 64 px está disponível para uso menor.
+Na versão original, o jogo usava 96 px; o Afogado ficava em escala 1 e o
+Guardião em 1,5. A revisão acima substitui o sprite do Guardião em combate.
 A direção horizontal é espelhada em runtime. As poses não incluem oito direções.
 
 As folhas *_sheet_source.png preservam a geração original. O importador

@@ -51,6 +51,10 @@ var _evade_time := 0.0
 var _evade_direction := Vector2.DOWN
 var damage_multiplier := 1.0
 var skill_recharge_multiplier := 1.0
+var _learned: Array = []
+var _spinning := false
+var _spin_time := 0.0
+var _spin_pulse := 0.0
 
 
 func _process(delta: float) -> void:
@@ -66,12 +70,12 @@ func _process(delta: float) -> void:
 		_momentum = 0
 	if profile.id == "sharpshooter":
 		var moving := Input.get_vector("move_left", "move_right", "move_up", "move_down").length_squared() > 0.01
-		if moving or _knockback_velocity.length() > 5.0:
+		if moving or _knockback_velocity.length() > 5.0 or _evade_time > 0.0:
 			_steady_time = 0.0
 			_steady_ready = false
 		elif not body.is_action_playing() and not _skill_busy:
 			_steady_time += delta
-			if _steady_time >= 0.9 and not _steady_ready:
+			if _steady_time >= 1.2 and not _steady_ready:
 				_steady_ready = true
 				passive_triggered.emit(profile.passive_name)
 	if cooldown_remaining > 0.0:
@@ -111,6 +115,7 @@ func _ready() -> void:
 	for hitbox in [melee_hitbox, dash_hitbox, dive_hitbox]:
 		hitbox.hit_confirmed.connect(_on_primary_hit.bind(hitbox == dive_hitbox))
 	_apply_profile()
+	GameState.progression_changed.connect(_on_progression_changed)
 	_configure_camera()
 
 
@@ -124,6 +129,8 @@ func _physics_process(delta: float) -> void:
 		velocity = Vector2.ZERO
 		body.set_locomotion(false, false)
 		return
+	if _spinning:
+		_process_spin(delta)
 	if Input.is_action_just_pressed("evade"):
 		_use_evade()
 	if _evade_time > 0.0:
@@ -147,7 +154,8 @@ func _physics_process(delta: float) -> void:
 	else:
 		var sprint_multiplier := SPRINT_MULTIPLIER if Input.is_action_pressed("sprint") else 1.0
 		var flow_multiplier := 1.2 if _flow_time > 0.0 else 1.0
-		velocity = input_vector.normalized() * float(profile.speed) * sprint_multiplier * flow_multiplier + _knockback_velocity
+		var spin_speed := 0.65 if _spinning else 1.0
+		velocity = input_vector.normalized() * float(profile.speed) * sprint_multiplier * flow_multiplier * spin_speed + _knockback_velocity
 	_knockback_velocity = _knockback_velocity.move_toward(Vector2.ZERO, 850.0 * delta)
 
 	var previous_position := global_position
@@ -183,6 +191,26 @@ func _apply_profile() -> void:
 	melee_hitbox.damage = float(profile.damage)
 	dash_hitbox.damage = float(profile.damage)
 	dive_hitbox.damage = float(profile.damage)
+	refresh_progression()
+
+
+func _on_progression_changed(character_id: String) -> void:
+	if character_id == profile.id:
+		refresh_progression()
+
+
+func refresh_progression() -> void:
+	_learned = GameState.get_learned_skills(profile.id)
+	damage_multiplier = 1.2 if _learned.has("power") else 1.0
+	skill_recharge_multiplier = 0.8 if _learned.has("recharge") else 1.0
+	var maximum: float = float(profile.max_health) * (1.25 if _learned.has("vitality") else 1.0)
+	var increase: float = maximum - health_component.max_health
+	health_component.max_health = maximum
+	if increase > 0.0:
+		health_component.heal(increase)
+	else:
+		health_component.current_health = minf(health_component.current_health, maximum)
+		health_component.health_changed.emit(health_component.current_health, maximum)
 
 
 ## Ajusta a câmera ao tamanho informado pela arena, evitando duplicar limites no script.
@@ -208,7 +236,7 @@ func _use_evade() -> void:
 	var direction := Input.get_vector("move_left", "move_right", "move_up", "move_down")
 	_evade_direction = direction.normalized() if direction.length_squared() > 0.01 else facing
 	_evade_time = 0.18
-	evade_cooldown = 1.1
+	evade_cooldown = 0.8 if _learned.has("evade_mastery") else 1.1
 	_knockback_velocity = Vector2.ZERO
 	FEEDBACK.burst(get_parent(), global_position, Color("80e5ec"))
 	FEEDBACK.sound(self, "swish")
@@ -236,6 +264,7 @@ func debug_kill() -> void:
 func set_controls_enabled(enabled: bool) -> void:
 	_controls_enabled = enabled and not _dead
 	if not _controls_enabled:
+		_stop_spin()
 		velocity = Vector2.ZERO
 		body.set_locomotion(false, false)
 
@@ -321,7 +350,14 @@ func _animate_shoot() -> void:
 	# The animation faces horizontally: emit from the drawn harpoon muzzle,
 	# while keeping the flight direction aimed at the cursor.
 	var muzzle := Vector2(-52.0 if body.flip_h else 52.0, -14.0)
-	_fire_harpoon(direction, float(profile.damage) * (1.4 if aimed else 1.0), 2 if aimed else 1, body.to_global(muzzle))
+	var damage: float = float(profile.damage) * (1.25 if aimed else 1.0)
+	var targets := (3 if _learned.has("passive_mastery") else 2) if aimed else 1
+	var origin := body.to_global(muzzle)
+	if _learned.has("double_shot"):
+		for side in [-1, 1]:
+			_fire_harpoon(direction, damage * 0.65, targets, origin + direction.orthogonal() * side * 9)
+	else:
+		_fire_harpoon(direction, damage, targets, origin)
 
 
 ## Marca um ponto no cursor e mergulha até ele, causando dano em área ao retornar.
@@ -353,6 +389,8 @@ func _animate_dive() -> void:
 	dive_hitbox.damage = float(profile.damage) * damage_multiplier * 1.35
 	dive_hitbox.activate(0.18)
 	_create_dive_splash()
+	if _learned.has("double_echo"):
+		_dive_echoes(global_position)
 	var return_tween := create_tween()
 	return_tween.tween_property(body, "modulate:a", 1.0, 0.16)
 	await get_tree().create_timer(0.22, false).timeout
@@ -469,6 +507,7 @@ func _on_damaged(_amount: float, _source_position: Vector2) -> void:
 ## Interrompe controles, achata o placeholder e comunica a derrota à arena.
 func _on_died() -> void:
 	_dead = true
+	_stop_spin()
 	_evade_time = 0.0
 	_skill_busy = false
 	for hitbox in [melee_hitbox, dash_hitbox, dive_hitbox]:
@@ -496,14 +535,15 @@ func _on_primary_hit(_actor: Node2D, _amount: float, dive_hit := false) -> void:
 	if _dead:
 		return
 	if profile.id == "breaker":
-		_momentum = mini(3, _momentum + 1)
-		_momentum_time = 8.0
-		if _momentum == 3:
+		var max_stacks := 4 if _learned.has("passive_mastery") else 3
+		_momentum = mini(max_stacks, _momentum + 1)
+		_momentum_time = 12.0 if _learned.has("passive_mastery") else 8.0
+		if _momentum == max_stacks:
 			passive_triggered.emit(profile.passive_name)
 	elif profile.id == "diver" and dive_hit and not _dive_healed:
 		_dive_healed = true
-		health_component.heal(6.0)
-		_flow_time = 2.0
+		health_component.heal(9.0 if _learned.has("passive_mastery") else 6.0)
+		_flow_time = 3.0 if _learned.has("passive_mastery") else 2.0
 		passive_triggered.emit(profile.passive_name)
 		FEEDBACK.burst(get_parent(), global_position, Color("83dfbe"))
 
@@ -511,7 +551,7 @@ func _on_primary_hit(_actor: Node2D, _amount: float, dive_hit := false) -> void:
 func get_passive_status() -> String:
 	match profile.id:
 		"breaker":
-			return "%s · %d/3" % [profile.passive_name, _momentum]
+			return "%s · %d/%d" % [profile.passive_name, _momentum, 4 if _learned.has("passive_mastery") else 3]
 		"sharpshooter":
 			return "%s · %s" % [profile.passive_name, "PRONTA" if _steady_ready else "firme a mira"]
 		"diver":
@@ -521,7 +561,7 @@ func get_passive_status() -> String:
 
 func _fire_harpoon(direction: Vector2, damage: float, targets: int, origin: Vector2) -> void:
 	var projectile := PROJECTILE.instantiate()
-	projectile.setup(profile.color, direction, damage * damage_multiplier, 1480.0, 300.0)
+	projectile.setup(profile.color, direction, damage * damage_multiplier, 1160.0, 100.0)
 	projectile.pierce_count = targets
 	get_parent().add_child(projectile)
 	projectile.global_position = origin
@@ -548,6 +588,13 @@ func _use_special_action() -> void:
 
 
 func _anchor_vortex() -> void:
+	if _learned.has("held_spin"):
+		_spinning = true
+		_spin_time = 0.0
+		_spin_pulse = 0.0
+		_momentum = 0
+		_momentum_time = 0.0
+		return
 	var power := 90.0 + 15.0 * _momentum
 	_momentum = 0
 	_momentum_time = 0.0
@@ -572,7 +619,7 @@ func _harpoon_fan() -> void:
 		return
 	var muzzle := body.to_global(Vector2(-52.0 if body.flip_h else 52.0, -14.0))
 	for index in 5:
-		_fire_harpoon(direction.rotated((index - 2) * 0.14), 36.0, 3, muzzle)
+		_fire_harpoon(direction.rotated((index - 2) * 0.14), 22.0, 3, muzzle)
 	FEEDBACK.burst(get_parent(), muzzle, profile.color)
 	FEEDBACK.sound(self, "swish")
 	await get_tree().create_timer(0.35, false).timeout
@@ -594,6 +641,39 @@ func _tidal_current() -> void:
 		_damage_nearby(center, 210.0, 16.0, true)
 		FEEDBACK.sound(self, "protect")
 		await get_tree().create_timer(0.65, false).timeout
+
+
+func _dive_echoes(center: Vector2) -> void:
+	for echo in 2:
+		await get_tree().create_timer(0.28, false).timeout
+		if _dead or not _controls_enabled:
+			return
+		_skill_ring(center, 100.0, profile.color, 0.24)
+		_damage_nearby(center, 100.0, float(profile.damage) * 0.35, false)
+		FEEDBACK.sound(self, "protect")
+
+
+func _process_spin(delta: float) -> void:
+	_spin_time += delta
+	_spin_pulse -= delta
+	# Always deliver the opening pulse; subsequent pulses require holding Q.
+	if _spin_time >= 0.30 and (not Input.is_action_pressed("special_action") or _spin_time >= 2.1):
+		_stop_spin()
+		return
+	body.rotation += delta * TAU * 1.8
+	if _spin_pulse <= 0.0:
+		_spin_pulse = 0.35
+		_skill_ring(global_position, 150.0, profile.color, 0.24)
+		_damage_nearby(global_position, 150.0, 27.0, false)
+		FEEDBACK.sound(self, "heavy_swing")
+
+
+func _stop_spin() -> void:
+	if not _spinning:
+		return
+	_spinning = false
+	_skill_busy = false
+	body.rotation = 0.0
 
 
 func _damage_nearby(center: Vector2, radius: float, damage: float, pull: bool) -> void:

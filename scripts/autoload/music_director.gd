@@ -48,8 +48,9 @@ func set_context(next: String, fade := 1.5) -> void:
 		_transition.kill()
 	_transition = create_tween().set_parallel(true)
 	var offset := linear_to_db(music_volume) if music_volume > 0.0 else SILENT_DB
-	var levels := [-9.0, -12.0 if context in ["waves", "boss"] else SILENT_DB,
-		-8.0 if context == "boss" else SILENT_DB]
+	var levels := [-13.0 if context == "boss" else -9.0,
+		-8.0 if context == "boss" else -12.0 if context == "waves" else SILENT_DB,
+		-4.0 if context == "boss" else SILENT_DB]
 	for index in _players.size():
 		var target := maxf(SILENT_DB, float(levels[index]) + offset)
 		_transition.tween_property(_players[index], "volume_db", target, fade)

@@ -2,7 +2,7 @@ extends SceneTree
 ## Importa as duas folhas geradas, preserva transparência e registra os pés por linha.
 
 const DIRECTORY := "res://assets/sprites/enemies/"
-const NAMES := ["afogado", "guardiao_abissal"]
+const NAMES := ["afogado", "guardiao_abissal", "afogado_pesado", "colosso_afogado"]
 
 
 func _initialize() -> void:

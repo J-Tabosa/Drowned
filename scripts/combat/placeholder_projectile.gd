@@ -9,6 +9,8 @@ var _flight_time := 0.0
 var pierce_count := 1
 var _hit_targets: Dictionary = {}
 var _arena: Node2D
+var _origin := Vector2.INF
+var max_range := 820.0
 
 
 ## Configura aparência, direção e dano antes de o projétil entrar na árvore da cena.
@@ -44,6 +46,8 @@ func _process(delta: float) -> void:
 
 ## Move o disparo em linha reta e o remove quando ele deixa os limites amplos do mapa.
 func _physics_process(delta: float) -> void:
+	if not _origin.is_finite():
+		_origin = global_position
 	var target := global_position + direction * speed * delta
 	if is_instance_valid(_arena) and _arena.has_method("get_farthest_walkable_position"):
 		var reachable: Vector2 = _arena.get_farthest_walkable_position(global_position, target, 4.0)
@@ -51,7 +55,7 @@ func _physics_process(delta: float) -> void:
 			queue_free()
 			return
 	global_position = target
-	if _flight_time > 3.0 or not _world_bounds.has_point(global_position):
+	if _flight_time > 3.0 or global_position.distance_to(_origin) > max_range or not _world_bounds.has_point(global_position):
 		queue_free()
 
 

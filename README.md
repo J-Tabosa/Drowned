@@ -4,7 +4,8 @@ Projeto Godot do RPG **Drowned**.
 
 ## Documentação
 
-- [`docs/gameplay_rhythm.md`](docs/gameplay_rhythm.md): esquiva, emboscadas, ondas variadas, recursos e melhorias por partida.
+- [`docs/skill_trees_and_boss.md`](docs/skill_trees_and_boss.md): árvores por personagem (Tab), XP exclusivo do primeiro boss, estalactites e revisão de equilíbrio.
+- [`docs/gameplay_rhythm.md`](docs/gameplay_rhythm.md): esquiva, emboscadas, ondas variadas e recursos de fôlego.
 
 - [`docs/title_and_dialogue.md`](docs/title_and_dialogue.md): título animado, tempestade, seleção simplificada, fades e caverna dos diálogos.
 

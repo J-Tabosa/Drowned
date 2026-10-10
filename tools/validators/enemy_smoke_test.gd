@@ -128,7 +128,7 @@ func _run() -> void:
 	var boss: Variant = _spawn(lab, boss_position, {"is_miniboss": true, "body_size": Vector2(104, 128), "max_health": 700.0})
 	boss.set_physics_process(false)
 	assert(boss.body.texture != load("res://assets/sprites/enemies/afogado_sheet_96.png"))
-	assert(boss.body.scale == Vector2(1.5, 1.5))
+	assert(boss.body.scale == Vector2(3, 3))
 	boss._start_boss_dash(Vector2.RIGHT)
 	assert(boss._boss_telegraphing)
 	paused = true

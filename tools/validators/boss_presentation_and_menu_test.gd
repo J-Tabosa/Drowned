@@ -32,6 +32,9 @@ func _run() -> void:
 		{"is_miniboss": true, "max_health": 700.0})
 	lab._boss.set_active(false)
 	lab._boss.set_physics_process(false)
+	var guard: Variant = lab._spawn_enemy(lab.player.global_position + Vector2(50, 0), {})
+	guard.set_active(true)
+	var presentation_health: float = lab.player.health_component.current_health
 	lab._stage = lab.EncounterStage.REACH_BOSS
 	lab._begin_boss_fight()
 	await create_timer(0.7).timeout
@@ -39,6 +42,8 @@ func _run() -> void:
 	assert(card.curtain.visible)
 	assert(lab._stage == lab.EncounterStage.BOSS_PRESENTATION)
 	assert(not lab._boss.can_receive_damage())
+	assert(not guard._active, "Nearby guards must wait during the presentation")
+	assert(lab.player.health_component.current_health == presentation_health)
 	assert(card.portrait_sprite.texture == lab._boss.body.texture,
 		"Presentation must use the actual combat boss sheet")
 	assert(card.portrait_sprite.hframes == 6 and card.portrait_sprite.vframes == 5)
@@ -63,6 +68,9 @@ func _run() -> void:
 	assert(not card.curtain.visible)
 	assert(lab._boss.can_receive_damage() and lab.boss_panel.visible)
 	assert(lab.player._controls_enabled)
+	assert(guard._active, "Guards must resume after the presentation")
+	assert(lab.player.health_component.current_health == presentation_health)
+	guard.set_active(false)
 	# Esc opens the pause menu; both destinations remain reachable from it.
 	var escape := InputEventKey.new()
 	escape.keycode = KEY_ESCAPE

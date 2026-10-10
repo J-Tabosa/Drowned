@@ -84,11 +84,11 @@ var _passive_label: Label
 var _path_encounter_index := 0
 var _echoes_found: Array[int] = []
 var _near_echo := -1
-var _reward_panel: ColorRect
-var _reward_pending := false
+var _skill_tree: ColorRect
+var _tree_button: Button
+var _boss_xp_awarded := false
 var _defeats := 0
 var _run_time := 0.0
-var _upgrades: Array[String] = []
 var _approach_pack_spawned := false
 var _guide_path := PackedVector2Array()
 var _guide_target := Vector2.INF
@@ -107,9 +107,16 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_layout_hud)
 	_layout_hud()
 	_spawn_player()
-	_reward_panel = preload("res://scripts/ui/run_reward_panel.gd").new()
-	$Interface.add_child(_reward_panel)
-	_reward_panel.chosen.connect(_choose_wave_reward)
+	_skill_tree = preload("res://scripts/ui/skill_tree_panel.gd").new()
+	$Interface.add_child(_skill_tree)
+	_tree_button = Button.new()
+	_tree_button.text = "Tab · Árvore · %d XP" % GameState.get_skill_xp(player.profile.id)
+	_tree_button.theme = NauticalUI.theme(player.profile.color)
+	_tree_button.add_theme_font_size_override("font_size", 12)
+	_tree_button.pressed.connect(_open_skill_tree)
+	$Interface.add_child(_tree_button)
+	GameState.progression_changed.connect(_on_progression_changed)
+	_layout_hud()
 	arena.item_collected.connect(_on_item_collected)
 	arena.gate_opened.connect(_on_gate_opened)
 	_on_item_collected(0, arena.get_item_positions().size())
@@ -346,6 +353,8 @@ func _layout_hud() -> void:
 	relic_label.position = Vector2(margin, screen.y - 28) * _hud_pixel_scale
 	relic_label.size = Vector2(180, 20)
 	relic_label.add_theme_font_size_override("font_size", 12)
+	if is_instance_valid(_tree_button):
+		_place_compact_panel(_tree_button, Rect2(margin, screen.y - 62, 210, 28))
 	enemy_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
 	enemy_label.scale = Vector2.ONE * _hud_pixel_scale
 	enemy_label.position = Vector2((screen.x - 260) * 0.5, 148) * _hud_pixel_scale
@@ -572,7 +581,7 @@ func _nearby_spawn(index: int, total: int) -> Vector2:
 
 
 func _enemy_profile(kind: String) -> Dictionary:
-	var config := {"engaged": true, "max_health": 78.0, "move_speed": 135.0, "attack_damage": 12.0, "attack_windup": 0.38}
+	var config := {"enemy_kind": kind, "engaged": true, "max_health": 78.0, "move_speed": 135.0, "attack_damage": 12.0, "attack_windup": 0.38}
 	if kind == "hunter":
 		config.merge({"display_name": "Afogado Caçador", "can_charge": true, "max_health": 62.0, "move_speed": 172.0, "body_color": Color("b0dfd0"), "boss_dash_cooldown": 3.8, "boss_dash_speed": 480.0, "boss_dash_duration": 0.42, "boss_dash_telegraph_time": 0.65, "boss_dash_damage": 17.0}, true)
 	elif kind == "brute":
@@ -582,30 +591,7 @@ func _enemy_profile(kind: String) -> Dictionary:
 
 func _spawn_warned_enemy(position: Vector2, config: Dictionary) -> void:
 	var enemy := _spawn_enemy(position, config)
-	enemy.set_active(false)
-	var ring := Line2D.new()
-	ring.width = 3.0
-	ring.default_color = Color("efb46b")
-	for index in 25:
-		ring.add_point(Vector2.from_angle(TAU * float(index) / 24.0) * 34.0)
-	add_child(ring)
-	ring.global_position = position
-	ring.z_index = 5
-	var label := Label.new()
-	label.text = enemy.display_name
-	label.position = Vector2(-78, -66)
-	label.size.x = 156
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", 13)
-	label.add_theme_color_override("font_shadow_color", Color("081722"))
-	label.add_theme_constant_override("shadow_outline_size", 4)
-	ring.add_child(label)
-	enemy.defeated.connect(ring.queue_free, CONNECT_ONE_SHOT)
-	await get_tree().create_timer(0.7, false).timeout
-	if is_instance_valid(ring):
-		ring.queue_free()
-	if is_instance_valid(enemy) and not enemy._dead and not _round_finished:
-		enemy.set_active(true)
+	enemy.emerge_from_ground()
 
 
 ## Inicia uma sequência de ondas para dar peso à câmara sem despejar tudo ao mesmo tempo.
@@ -649,29 +635,9 @@ func _queue_next_combat_wave() -> void:
 	if _wave_transition_pending:
 		return
 	_wave_transition_pending = true
-	_reward_pending = true
 	player.health_component.heal(player.health_component.max_health * 0.12)
 	player.skill_cooldown_remaining = 0.0
-	player.set_controls_enabled(false)
-	_set_objective("Escolha uma melhoria antes da próxima onda.")
-	_reward_panel.present(_combat_wave + 1)
-
-
-func _choose_wave_reward(upgrade: String) -> void:
-	if not _reward_pending or _round_finished or not upgrade in ["power", "recharge", "vitality"]:
-		return
-	_reward_pending = false
-	_reward_panel.hide()
-	_upgrades.append(upgrade)
-	match upgrade:
-		"power": player.damage_multiplier *= 1.2
-		"recharge": player.skill_recharge_multiplier *= 0.8
-		"vitality":
-			var increase: float = player.health_component.max_health * 0.25
-			player.health_component.max_health += increase
-			player.health_component.heal(increase)
-	player.set_controls_enabled(true)
-	_set_objective("Melhoria recebida. A próxima onda chega em instantes.")
+	_set_objective("Recupere o fôlego. A próxima onda chega em instantes.")
 	if skip_cinematics_for_tests:
 		call_deferred("_start_next_combat_wave")
 	else:
@@ -699,7 +665,7 @@ func _spawn_enemy(spawn_position: Vector2, config: Dictionary = {}) -> Character
 	return enemy
 
 
-## Cria o Guardião no B, com 700 de vida, mas o mantém dormente durante a revelação.
+## Cria o colosso no B e o mantém dormente durante a revelação.
 func _spawn_boss_for_reveal() -> void:
 	if _boss_spawned:
 		return
@@ -708,12 +674,12 @@ func _spawn_boss_for_reveal() -> void:
 		"display_name": "Guardião Abissal",
 		"is_miniboss": true,
 		"engaged": true,
-		"body_size": Vector2(104, 128),
-		"max_health": 700.0,
-		"move_speed": 118.0,
+		"body_size": Vector2(160, 170),
+		"max_health": 1100.0,
+		"move_speed": 148.0,
 		"attack_damage": 25.0,
 		"aggro_range": 1150.0,
-		"attack_range": 116.0,
+		"attack_range": 138.0,
 		"attack_cooldown": 0.82,
 		"attack_windup": 0.42,
 		"boss_dash_cooldown": 3.25,
@@ -771,19 +737,27 @@ func _begin_boss_fight(skip_card := false) -> void:
 	_stage = EncounterStage.BOSS_PRESENTATION
 	MusicDirector.set_context("boss")
 	player.set_controls_enabled(false)
+	var suspended_enemies: Array[Node2D] = []
+	for enemy in get_tree().get_nodes_in_group("enemies"):
+		if enemy != _boss and enemy.get("_active") == true:
+			suspended_enemies.append(enemy)
+			enemy.set_active(false)
 	if not skip_card:
 		await boss_intro_card.play(
 			"GUARDIÃO ABISSAL",
 			"(Guardião das Profundezas) — MINICHEFE",
-			"Uma sentinela ancestral da caverna. Seu dash percorre toda a área marcada antes do impacto.",
+			"Um colosso afogado. Seus rugidos derrubam estalactites: mova-se, desvie da investida e ataque na recuperação.",
 			Color("9b58b5"), 2.7, _boss.body.texture
 		)
+	for enemy in suspended_enemies:
+		if is_instance_valid(enemy):
+			enemy.set_active(true)
 	boss_panel.visible = true
 	_boss.set_active(true)
 	player.set_controls_enabled(true)
 	_stage = EncounterStage.BOSS
 	_set_stage_text("3/3  GUARDIÃO ABISSAL")
-	_set_objective("Observe a faixa vermelha, desvie do dash e derrote o Guardião.")
+	_set_objective("Saia das sombras das estalactites, desvie da investida e ataque após os golpes.")
 
 
 ## Atualiza o dispositivo de entrada, alterna fullscreen/debug e mantém atalhos globais ativos.
@@ -794,8 +768,18 @@ func _input(event: InputEvent) -> void:
 		_objective_mouse_position = event.position
 	if DialogueManager.is_playing():
 		return
+	if event.is_action_pressed("skill_tree") and not event.is_echo():
+		if _skill_tree.visible:
+			_skill_tree.close()
+		else:
+			_open_skill_tree()
+		get_viewport().set_input_as_handled()
+		return
 	if event.is_action_pressed("ui_cancel"):
-		_toggle_pause()
+		if _skill_tree.visible:
+			_skill_tree.close()
+		else:
+			_toggle_pause()
 		get_viewport().set_input_as_handled()
 		return
 	if event is InputEventMouseButton or event is InputEventMouseMotion:
@@ -818,6 +802,9 @@ func _input(event: InputEvent) -> void:
 
 ## Pausa o mundo mantendo a interface de pausa disponível.
 func _toggle_pause() -> void:
+	if _skill_tree.visible:
+		_skill_tree.close()
+		return
 	var should_pause := not get_tree().paused
 	get_tree().paused = should_pause
 	pause_panel.visible = should_pause
@@ -880,7 +867,7 @@ func _refresh_action_prompt() -> void:
 			movement_prompt = "analógico esquerdo"
 			sprint_prompt = "botão de corrida"
 	action_label.text = "%s: %s" % [action_prompt, profile.action_name]
-	controls_label.text = "%s: mover  •  %s: correr  •  %s: ataque  •  Q / botão direito: especial  •  Shift: esquiva  •  E: eco  •  Esc: pausa  •  F11: tela cheia" % [movement_prompt, sprint_prompt, action_prompt]
+	controls_label.text = "%s: mover  •  %s: correr  •  %s: ataque  •  Q / botão direito: especial  •  Shift: esquiva  •  E: eco  •  Tab: árvore  •  Esc: pausa  •  F11: tela cheia" % [movement_prompt, sprint_prompt, action_prompt]
 
 
 ## Reinicia a recarga visual e registra o uso da habilidade no tutorial.
@@ -900,7 +887,7 @@ func _on_player_health_changed(current: float, maximum: float) -> void:
 	health_label.text = "VIDA  %d / %d" % [ceili(current), ceili(maximum)]
 
 
-## Mantém a barra exclusiva do Guardião sincronizada com seus 700 pontos de vida.
+## Mantém a barra exclusiva do Guardião sincronizada com sua vida.
 func _on_boss_health_changed(current: float, maximum: float) -> void:
 	boss_health_bar.max_value = maximum
 	boss_health_bar.value = current
@@ -930,12 +917,23 @@ func _on_enemy_defeated(enemy: Node2D = null) -> void:
 			_queue_next_combat_wave()
 		else:
 			_begin_boss_reveal()
-	elif _stage == EncounterStage.BOSS and _enemies_alive == 0:
+	elif _stage == EncounterStage.BOSS and is_instance_valid(enemy) and enemy.is_miniboss:
 		MusicDirector.set_context("cavern")
 		arena.mark_boss_defeated()
 		_objective_completed("Guardião derrotado — selo do portão rompido")
 		_stage = EncounterStage.REACH_EXIT
 		boss_panel.visible = false
+		if not _boss_xp_awarded:
+			_boss_xp_awarded = true
+			GameState.collect_boss_xp(player.profile.id, 100, "guardian_prologue")
+			for index in 6:
+				var mote := preload("res://scripts/gameplay/breath_pickup.gd").new()
+				mote.player = player
+				mote.arena = arena
+				mote.is_boss_xp = true
+				add_child(mote)
+				mote.global_position = enemy.global_position + Vector2.from_angle(TAU * index / 6.0) * 32.0
+			_notify("100 XP · Tab para evoluir uma habilidade", Color("e8c36d"), "protect")
 		_set_stage_text("SAÍDA DA GRUTA")
 		_set_objective("Leve uma chave-bússola ao portão laranja." if arena.has_exit_key() else "Encontre uma chave-bússola dourada para abrir o portão laranja.")
 
@@ -990,8 +988,7 @@ func _finish_round(victory: bool) -> void:
 	tutorial_panel.visible = false
 	enemy_label.visible = false
 	result_title.text = "FIM DO PRÓLOGO" if victory else "VOCÊ SE AFOGOU"
-	result_detail.text = "%d:%02d • %d inimigos derrotados • %d melhorias\n%s" % [int(_run_time) / 60, int(_run_time) % 60, _defeats, _upgrades.size(), "A expedição segue além da gruta." if victory else "Desvie da faixa de investida e busque os brilhos verdes."]
-	_reward_panel.hide()
+	result_detail.text = "%d:%02d • %d inimigos derrotados • %d habilidades aprendidas\n%s" % [int(_run_time) / 60, int(_run_time) % 60, _defeats, GameState.get_learned_skills(player.profile.id).size(), "A expedição segue além da gruta." if victory else "Desvie dos ataques e busque os brilhos verdes."]
 	result_title.add_theme_color_override("font_color", Color("65d6a6") if victory else Color("e85d75"))
 	_set_stage_text("CONCLUÍDO" if victory else "DERROTA")
 	_set_objective("Prólogo concluído." if victory else "Recupere o fôlego e tente novamente.")
@@ -1040,6 +1037,19 @@ func _refresh_skill_status() -> void:
 	_skill_label.text = "Q · %s · %s" % [player.profile.skill_name, "PRONTA" if remaining == 0.0 else "%.1f s" % remaining]
 	_skill_label.add_theme_color_override("font_color", player.profile.color if remaining == 0.0 else Color("bdcbd4"))
 	_passive_label.text = player.get_passive_status()
+
+
+func _open_skill_tree() -> void:
+	if get_tree().paused or SceneTransition.busy:
+		return
+	if not _round_finished and not player._controls_enabled:
+		return
+	_skill_tree.present(player.profile)
+
+
+func _on_progression_changed(character_id: String) -> void:
+	if character_id == player.profile.id:
+		_tree_button.text = "Tab · Árvore · %d XP" % GameState.get_skill_xp(character_id)
 
 
 func _on_skill_used(skill_name: String, _cooldown: float) -> void:

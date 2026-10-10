@@ -4,7 +4,9 @@ signal defeated
 
 const FEEDBACK := preload("res://scripts/components/gameplay_feedback.gd")
 const NORMAL_SHEET := preload("res://assets/sprites/enemies/afogado_sheet_96.png")
-const BOSS_SHEET := preload("res://assets/sprites/enemies/guardiao_abissal_sheet_96.png")
+const BOSS_SHEET := preload("res://assets/sprites/enemies/colosso_afogado_sheet_64.png")
+const HEAVY_SHEET := preload("res://assets/sprites/enemies/afogado_pesado_sheet_64.png")
+const STALACTITE := preload("res://scripts/combat/falling_stalactite.gd")
 
 @export var move_speed := 105.0
 @export var attack_damage := 18.0
@@ -55,12 +57,19 @@ var _attack_direction := Vector2.DOWN
 var _dash_elapsed := 0.0
 var _hurt_timer := 0.0
 var _damage_tween: Tween
+var enemy_kind := "sailor"
+var _emerging := false
+var _roar_timer := 1.8
+var _roaring := false
+var _roar_elapsed := 0.0
+var _boss_attack_index := 0
 
 
 func setup(config: Dictionary) -> void:
 	display_name = String(config.get("display_name", display_name))
 	is_miniboss = bool(config.get("is_miniboss", is_miniboss))
 	can_charge = bool(config.get("can_charge", false))
+	enemy_kind = String(config.get("enemy_kind", enemy_kind))
 	_aggro = bool(config.get("engaged", _aggro))
 	for property in ["move_speed", "attack_damage", "max_health", "aggro_range", "attack_range", "attack_cooldown", "boss_dash_cooldown", "boss_dash_speed", "boss_dash_duration", "boss_dash_telegraph_time", "boss_dash_damage"]:
 		set(property, float(config.get(property, get(property))))
@@ -99,6 +108,14 @@ func _physics_process(delta: float) -> void:
 	var distance := offset.length()
 	var direction := offset.normalized() if distance > 1.0 else Vector2.DOWN
 	_aggro = _aggro or distance <= aggro_range
+	if is_miniboss and _aggro:
+		_roar_timer -= delta
+		if _roaring:
+			_roar_elapsed += delta
+			velocity = Vector2.ZERO
+			if _roar_elapsed >= 0.85:
+				_release_roar()
+			return
 	_hurt_timer = maxf(0.0, _hurt_timer - delta)
 	_boss_dash_timer -= delta if _aggro else 0.0
 	if _boss_telegraphing:
@@ -114,6 +131,9 @@ func _physics_process(delta: float) -> void:
 		_process_attack(delta)
 		_move_actor(_knockback_velocity, delta)
 		body.set_locomotion(false)
+		return
+	if is_miniboss and _aggro and _roar_timer <= 0.0:
+		_start_roar()
 		return
 	if _hurt_timer > 0.0:
 		_move_actor(_knockback_velocity, delta)
@@ -137,13 +157,13 @@ func _physics_process(delta: float) -> void:
 
 
 func _apply_variant() -> void:
-	body.configure(BOSS_SHEET if is_miniboss else NORMAL_SHEET)
-	body.scale = Vector2.ONE * (1.5 if is_miniboss else 1.0)
-	body.position = Vector2(0, -8 if is_miniboss else -6)
+	body.configure(BOSS_SHEET if is_miniboss else HEAVY_SHEET if enemy_kind == "brute" else NORMAL_SHEET)
+	body.scale = Vector2.ONE * (3.0 if is_miniboss else 1.6 if enemy_kind == "brute" else 1.0)
+	body.position = Vector2(0, -20 if is_miniboss else -6)
 	body.modulate = body_color
-	if not is_miniboss:
+	if not is_miniboss and enemy_kind != "brute":
 		body.scale *= body_size.y / 58.0
-	_radius = 38.0 if is_miniboss else 20.0
+	_radius = 42.0 if is_miniboss else 20.0
 	var shape := CircleShape2D.new()
 	shape.radius = _radius
 	$CollisionShape2D.shape = shape
@@ -151,7 +171,7 @@ func _apply_variant() -> void:
 	hurtbox_shape.size = body_size * 0.94
 	$Hurtbox/CollisionShape2D.shape = hurtbox_shape
 	var attack_shape := RectangleShape2D.new()
-	attack_shape.size = Vector2(74, 72) if is_miniboss else Vector2(50, 44)
+	attack_shape.size = Vector2(120, 112) if is_miniboss else Vector2(64, 56) if enemy_kind == "brute" else Vector2(50, 44)
 	$AttackHitbox/CollisionShape2D.shape = attack_shape
 	shadow.position.y = 43.0 if is_miniboss else 30.0
 	shadow.scale = Vector2(1.6, 1.3) if is_miniboss else Vector2.ONE
@@ -230,7 +250,39 @@ func _move_actor(desired: Vector2, delta: float) -> void:
 
 
 func can_receive_damage() -> bool:
-	return not _dead and _active
+	return not _dead and _active and not _emerging
+
+
+func emerge_from_ground() -> void:
+	_emerging = true
+	set_active(false)
+	$CollisionShape2D.set_deferred("disabled", true)
+	var material := ShaderMaterial.new()
+	material.shader = preload("res://shaders/enemy_emergence.gdshader")
+	material.set_shader_parameter("reveal", 0.0)
+	body.material = material
+	body.modulate = body_color
+	# Mud fragments, no enemy name or circular spawn UI.
+	var dirt := Node2D.new()
+	dirt.name = "MudFragments"
+	add_child(dirt)
+	dirt.position.y = 26
+	dirt.draw.connect(func() -> void:
+		for index in 7:
+			dirt.draw_rect(Rect2(index * 9 - 29, (index % 3) * 3, 6, 3), Color("536052"))
+	)
+	var rising := create_tween()
+	rising.tween_method(func(value: float) -> void: material.set_shader_parameter("reveal", value),
+		0.0, 1.0, 0.9).set_trans(Tween.TRANS_SINE)
+	await rising.finished
+	if is_instance_valid(dirt):
+		dirt.queue_free()
+	if _dead:
+		return
+	body.material = null
+	_emerging = false
+	$CollisionShape2D.set_deferred("disabled", false)
+	set_active(true)
 
 
 func is_small_enemy() -> bool:
@@ -247,6 +299,7 @@ func set_active(active: bool) -> void:
 	if _active and is_miniboss:
 		_aggro = true
 		_boss_dash_timer = 1.6
+		_roar_timer = 1.8
 
 
 func receive_knockback(source_position: Vector2, force: float) -> void:
@@ -255,7 +308,7 @@ func receive_knockback(source_position: Vector2, force: float) -> void:
 	var direction := global_position - source_position
 	if direction.length_squared() < 1.0:
 		direction = Vector2.DOWN
-	_knockback_velocity = direction.normalized() * force * (0.3 if is_miniboss else 1.0)
+	_knockback_velocity = direction.normalized() * force * (0.0 if is_miniboss else 0.5 if enemy_kind == "brute" else 1.0)
 
 
 ## Direção travada na antecipação: o jogador pode sair antes do acerto.
@@ -285,7 +338,7 @@ func _process_attack(delta: float) -> void:
 			_clear_melee_telegraph()
 			_attack_state = "strike"
 			_attack_timer = 0.12
-			attack_hitbox.position = _attack_direction * (66.0 if is_miniboss else 43.0)
+			attack_hitbox.position = _attack_direction * (84.0 if is_miniboss else 43.0)
 			attack_hitbox.rotation = _attack_direction.angle()
 			attack_hitbox.damage = attack_damage
 			attack_hitbox.activate(0.12)
@@ -402,6 +455,7 @@ func _cancel_attack() -> void:
 	_attack_state = ""
 	_boss_dashing = false
 	_boss_telegraphing = false
+	_roaring = false
 	_can_attack = true
 	attack_hitbox.damage = attack_damage
 	attack_hitbox.knockback_force = 390.0 if is_miniboss else 250.0
@@ -419,7 +473,7 @@ func _on_damaged(_amount: float, source: Vector2) -> void:
 		_cancel_attack()
 		_hurt_timer = 0.18
 		body.play_hurt()
-	elif not _boss_dashing and not _boss_telegraphing and _attack_state == "":
+	elif not _boss_dashing and not _boss_telegraphing and not _roaring and _attack_state == "":
 		body.play_hurt()
 	FEEDBACK.impact(get_parent(), global_position + Vector2(0, -8), source.direction_to(global_position), is_miniboss)
 	FEEDBACK.sound(self, "heavy_hit" if is_miniboss else "hit")
@@ -433,9 +487,48 @@ func _enter_enraged_phase() -> void:
 	attack_damage *= 1.22
 	attack_cooldown *= 0.72
 	boss_dash_cooldown *= 0.82
+	_roar_timer = minf(_roar_timer, 1.0)
 	body.modulate = Color("c2edf0")
 	FEEDBACK.burst(get_parent(), global_position, Color("83ded7"))
 	FEEDBACK.sound(self, "boss_warning")
+
+
+func _start_roar() -> void:
+	if _dead or not _active or not is_instance_valid(_target):
+		return
+	_roaring = true
+	_roar_elapsed = 0.0
+	velocity = Vector2.ZERO
+	body.play_attack(1.0)
+	FEEDBACK.sound(self, "boss_warning")
+	FEEDBACK.burst(get_parent(), global_position, Color("86b7bc"))
+
+
+func _release_roar() -> void:
+	_roaring = false
+	_roar_timer = 4.6 if _enraged else 6.0
+	_boss_attack_index += 1
+	var center := _target.global_position
+	# Locked shadows: staying still is punished; movement opens a safe route.
+	var offsets: Array[Vector2] = [Vector2.ZERO, Vector2(110, 0), Vector2(-110, 0)]
+	if _enraged:
+		offsets.append(Vector2(0, 110))
+		offsets.append(Vector2(0, -110))
+	for index in offsets.size():
+		var position := center + offsets[index].rotated(_boss_attack_index * 0.65)
+		if is_instance_valid(_arena) and not _arena.is_walkable(position, 20.0):
+			continue
+		var hazard := STALACTITE.new()
+		hazard.target = _target
+		hazard.boss = self
+		hazard.warning_time = (0.85 if _enraged else 1.1) + index * 0.12
+		hazard.damage = 28.0 if _enraged else 24.0
+		get_parent().add_child(hazard)
+		hazard.global_position = position
+	_attack_state = "recovery"
+	_attack_timer = 0.65
+	_can_attack = false
+	FEEDBACK.sound(self, "heavy_death")
 
 
 ## Remove dano e colisão imediatamente; a animação termina antes da liberação do nó.
@@ -443,6 +536,8 @@ func _on_died() -> void:
 	if _dead:
 		return
 	_dead = true
+	_emerging = false
+	body.material = null
 	_active = false
 	velocity = Vector2.ZERO
 	_cancel_attack()
