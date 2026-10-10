@@ -115,6 +115,8 @@ func present(profile: Dictionary) -> void:
 
 func _refresh() -> void:
 	_balance.text = "%d XP disponíveis · O Guardião concede 100 XP. Inimigos comuns recuperam fôlego." % GameState.get_skill_xp(character_id)
+	if not GameState._debug_progression_backup.is_empty():
+		_balance.text = "%d XP de TESTE · Compras temporárias; o progresso real está preservado." % GameState.get_skill_xp(character_id)
 	for skill_id in _buttons:
 		var skill := CATALOG.find_skill(character_id, skill_id)
 		var learned := GameState.has_skill(character_id, skill_id)

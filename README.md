@@ -4,6 +4,7 @@ Projeto Godot do RPG **Drowned**.
 
 ## Documentação
 
+- [`docs/map_and_debug.md`](docs/map_and_debug.md): mapa com exploração (M) e três ferramentas ocultas por Ctrl + H + J.
 - [`docs/skill_trees_and_boss.md`](docs/skill_trees_and_boss.md): árvores por personagem (Tab), XP exclusivo do primeiro boss, estalactites e revisão de equilíbrio.
 - [`docs/gameplay_rhythm.md`](docs/gameplay_rhythm.md): esquiva, emboscadas, ondas variadas e recursos de fôlego.
 

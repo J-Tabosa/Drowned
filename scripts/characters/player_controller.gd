@@ -194,6 +194,16 @@ func _apply_profile() -> void:
 	refresh_progression()
 
 
+func debug_teleport(destination: Vector2) -> void:
+	set_controls_enabled(false)
+	_evade_time = 0.0
+	_knockback_velocity = Vector2.ZERO
+	velocity = Vector2.ZERO
+	global_position = destination
+	camera.reset_smoothing()
+	set_controls_enabled(true)
+
+
 func _on_progression_changed(character_id: String) -> void:
 	if character_id == profile.id:
 		refresh_progression()

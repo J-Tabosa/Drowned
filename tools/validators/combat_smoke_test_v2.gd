@@ -86,11 +86,12 @@ func _run() -> void:
 				assert(is_instance_valid(projectile))
 				assert(is_equal_approx(projectile.speed, 1160.0))
 				var muzzle := Vector2(-52.0 if lab.player.body.flip_h else 52.0, -14.0)
-				assert(projectile.global_position.distance_to(lab.player.body.to_global(muzzle)) < 65.0)
+				assert(projectile._origin.distance_to(lab.player.body.to_global(muzzle)) < 1.0,
+					"Harpoon must originate at the sprite muzzle regardless of frame timing")
 
 		lab.player.health_component.take_damage(20.0)
 		assert(lab.player.body.frame / 6 == 3)
-		lab._on_heal_debug_pressed()
+		lab.player.heal_full()
 		assert(lab.player.health_component.current_health == lab.player.health_component.max_health)
 		lab.queue_free()
 		await process_frame
@@ -174,7 +175,7 @@ func _run() -> void:
 	var death_lab: Variant = load("res://scenes/world/areas/movement_lab.tscn").instantiate()
 	root.add_child(death_lab)
 	await process_frame
-	death_lab._on_kill_debug_pressed()
+	death_lab.player.debug_kill()
 	await process_frame
 	assert(death_lab.player.health_component.current_health == 0.0)
 	assert(death_lab.result_panel.visible)

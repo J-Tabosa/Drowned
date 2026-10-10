@@ -407,40 +407,6 @@ offset_right = -22.0
 offset_bottom = 58.0
 text = "Trocar personagem"
 
-[node name="DeveloperPanel" type="ColorRect" parent="Interface"]
-unique_name_in_owner = true
-visible = false
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -366.0
-offset_top = 204.0
-offset_right = -22.0
-offset_bottom = 294.0
-color = Color(0.08, 0.035, 0.13, 0.94)
-
-[node name="DeveloperCaption" type="Label" parent="Interface/DeveloperPanel"]
-offset_left = 12.0
-offset_top = 8.0
-offset_right = 332.0
-offset_bottom = 28.0
-theme_override_colors/font_color = Color(0.84, 0.56, 0.92, 1)
-text = "DESENVOLVEDOR  [F3]"
-horizontal_alignment = 1
-
-[node name="HealDebug" type="Button" parent="Interface/DeveloperPanel"]
-offset_left = 12.0
-offset_top = 38.0
-offset_right = 160.0
-offset_bottom = 76.0
-text = "[DEBUG] Curar"
-
-[node name="KillDebug" type="Button" parent="Interface/DeveloperPanel"]
-offset_left = 172.0
-offset_top = 38.0
-offset_right = 332.0
-offset_bottom = 76.0
-text = "[DEBUG] Morrer"
-
 [node name="ResultPanel" type="ColorRect" parent="Interface"]
 unique_name_in_owner = true
 anchor_left = 0.5
@@ -490,6 +456,4 @@ text = "Tentar novamente"
 [connection signal="pressed" from="Interface/PausePanel/SettingsCard/Fullscreen" to="." method="_on_fullscreen_pressed"]
 [connection signal="toggled" from="Interface/PausePanel/SettingsCard/FogToggle" to="." method="_on_fog_toggled"]
 [connection signal="pressed" from="Interface/PausePanel/SettingsCard/CloseSettings" to="." method="_on_pause_settings_close_pressed"]
-[connection signal="pressed" from="Interface/DeveloperPanel/HealDebug" to="." method="_on_heal_debug_pressed"]
-[connection signal="pressed" from="Interface/DeveloperPanel/KillDebug" to="." method="_on_kill_debug_pressed"]
 [connection signal="pressed" from="Interface/ResultPanel/Restart" to="." method="_on_restart_pressed"]

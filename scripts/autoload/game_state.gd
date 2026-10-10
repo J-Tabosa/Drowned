@@ -4,6 +4,7 @@ signal progression_changed(character_id: String)
 const SKILLS := preload("res://scripts/gameplay/skill_catalog.gd")
 const PROGRESSION_FILE := "user://progression.cfg"
 var _progression: Dictionary = {}
+var _debug_progression_backup: Dictionary = {}
 
 const CHARACTER_PROFILES: Array[Dictionary] = [
 	{
@@ -128,11 +129,30 @@ func _load_progression() -> void:
 
 
 func _save_progression() -> void:
+	if not _debug_progression_backup.is_empty():
+		return
 	var config := ConfigFile.new()
 	for character_id in _progression:
 		config.set_value(character_id, "xp", _progression[character_id].xp)
 		config.set_value(character_id, "learned", _progression[character_id].learned)
 	config.save(PROGRESSION_FILE)
+
+
+## Debug purchases share the real validation path, but never touch the save file.
+func debug_skill_xp(character_id: String) -> void:
+	if not _valid_character(character_id): return
+	if _debug_progression_backup.is_empty():
+		_debug_progression_backup = _progression.duplicate(true)
+	_progression[character_id].xp += 1000
+	progression_changed.emit(character_id)
+
+
+func restore_debug_progression() -> void:
+	if _debug_progression_backup.is_empty(): return
+	_progression = _debug_progression_backup.duplicate(true)
+	_debug_progression_backup.clear()
+	for character_id in _progression:
+		progression_changed.emit(character_id)
 
 
 func get_skill_xp(character_id: String) -> int:

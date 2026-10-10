@@ -50,7 +50,6 @@ const COMBAT_WAVE_SIZES := [4, 5, 6]
 @onready var result_detail: Label = %ResultDetail
 @onready var pause_panel: ColorRect = %PausePanel
 @onready var settings_card: ColorRect = %SettingsCard
-@onready var developer_panel: ColorRect = %DeveloperPanel
 @onready var controls_label: Label = $Interface/Controls
 @onready var relic_label: Label = %RelicLabel
 
@@ -71,7 +70,6 @@ var _combat_spawn_cursor := 0
 var _wave_transition_pending := false
 var _boss_spawned := false
 var _round_finished := false
-var _developer_mode := false
 var _last_input_device := "keyboard"
 var _feedback_label: Label
 var _cooldown_label: Label
@@ -87,6 +85,11 @@ var _near_echo := -1
 var _skill_tree: ColorRect
 var _tree_button: Button
 var _boss_xp_awarded := false
+var _map_panel: ColorRect
+var _map_button: Button
+var _exploration: Node
+var _debug_tools: ColorRect
+var _debug_chord_latched := false
 var _defeats := 0
 var _run_time := 0.0
 var _approach_pack_spawned := false
@@ -98,8 +101,6 @@ var _guide_wait := 0.0
 ## Inicializa jogador e HUD usando exclusivamente marcadores fornecidos pelo blueprint do mapa.
 func _ready() -> void:
 	MusicDirector.set_context("cavern")
-	_developer_mode = OS.get_cmdline_args().has("--debug")
-	developer_panel.visible = _developer_mode
 	pause_panel.visible = false
 	settings_card.visible = false
 	_create_feedback_labels()
@@ -107,6 +108,36 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_layout_hud)
 	_layout_hud()
 	_spawn_player()
+	_exploration = preload("res://scripts/world/map_exploration.gd").new()
+	_exploration.arena = arena
+	_exploration.player = player
+	_exploration.process_mode = Node.PROCESS_MODE_PAUSABLE
+	add_child(_exploration)
+	_exploration.observe(player.global_position)
+	_map_panel = preload("res://scripts/ui/expedition_map_panel.gd").new()
+	$Interface.add_child(_map_panel)
+	_map_panel.setup(arena, _exploration, player)
+	_map_panel.teleport_requested.connect(_debug_teleport)
+	_map_button = Button.new()
+	_map_button.text = "M · Mapa"
+	_map_button.theme = NauticalUI.theme()
+	_map_button.add_theme_font_size_override("font_size", 12)
+	_map_button.pressed.connect(_open_map)
+	$Interface.add_child(_map_button)
+	_debug_tools = preload("res://scripts/ui/debug_tools_panel.gd").new()
+	$Interface.add_child(_debug_tools)
+	_debug_tools.tree_requested.connect(_debug_test_tree)
+	_debug_tools.restore_requested.connect(GameState.restore_debug_progression)
+	_debug_tools.teleport_requested.connect(func():
+		_debug_tools.close()
+		_open_map(true)
+	)
+	_debug_tools.reveal_requested.connect(func():
+		_exploration.toggle_debug_reveal()
+		_debug_tools.close()
+		_open_map()
+	)
+	tree_exiting.connect(GameState.restore_debug_progression)
 	_skill_tree = preload("res://scripts/ui/skill_tree_panel.gd").new()
 	$Interface.add_child(_skill_tree)
 	_tree_button = Button.new()
@@ -355,6 +386,8 @@ func _layout_hud() -> void:
 	relic_label.add_theme_font_size_override("font_size", 12)
 	if is_instance_valid(_tree_button):
 		_place_compact_panel(_tree_button, Rect2(margin, screen.y - 62, 210, 28))
+	if is_instance_valid(_map_button):
+		_place_compact_panel(_map_button, Rect2(margin + 218, screen.y - 62, 92, 28))
 	enemy_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
 	enemy_label.scale = Vector2.ONE * _hud_pixel_scale
 	enemy_label.position = Vector2((screen.x - 260) * 0.5, 148) * _hud_pixel_scale
@@ -768,7 +801,20 @@ func _input(event: InputEvent) -> void:
 		_objective_mouse_position = event.position
 	if DialogueManager.is_playing():
 		return
+	if _handle_debug_chord(event):
+		get_viewport().set_input_as_handled()
+		return
+	if event.is_action_pressed("world_map") and not event.is_echo():
+		if _map_panel.visible:
+			_map_panel.close()
+		else:
+			_open_map()
+		get_viewport().set_input_as_handled()
+		return
 	if event.is_action_pressed("skill_tree") and not event.is_echo():
+		if _map_panel.visible or _debug_tools.visible:
+			get_viewport().set_input_as_handled()
+			return
 		if _skill_tree.visible:
 			_skill_tree.close()
 		else:
@@ -776,7 +822,11 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 	if event.is_action_pressed("ui_cancel"):
-		if _skill_tree.visible:
+		if _map_panel.visible:
+			_map_panel.close()
+		elif _debug_tools.visible:
+			_debug_tools.close()
+		elif _skill_tree.visible:
 			_skill_tree.close()
 		else:
 			_toggle_pause()
@@ -792,12 +842,58 @@ func _input(event: InputEvent) -> void:
 			_toggle_fullscreen()
 			get_viewport().set_input_as_handled()
 			return
-		if event.keycode == KEY_F3:
-			_developer_mode = not _developer_mode
-			developer_panel.visible = _developer_mode
-			get_viewport().set_input_as_handled()
-			return
 	_refresh_action_prompt()
+
+
+func _handle_debug_chord(event: InputEvent) -> bool:
+	if not event is InputEventKey: return false
+	var chord := Input.is_key_pressed(KEY_CTRL) and Input.is_key_pressed(KEY_H) and Input.is_key_pressed(KEY_J)
+	if not chord:
+		_debug_chord_latched = false
+		return false
+	if _debug_chord_latched or event.echo: return false
+	_debug_chord_latched = true
+	if _debug_tools.visible:
+		_debug_tools.close()
+	else:
+		if _map_panel.visible: _map_panel.close()
+		if _skill_tree.visible: _skill_tree.close()
+		if not _round_finished and not player._controls_enabled: return true
+		_debug_tools.present()
+	return true
+
+
+func _open_map(teleport := false) -> void:
+	if SceneTransition.busy or _skill_tree.visible or _debug_tools.visible or _map_panel.visible: return
+	if not _round_finished and not player._controls_enabled: return
+	_map_panel.present(teleport)
+
+
+func _debug_test_tree() -> void:
+	if not _debug_tools.visible: return
+	GameState.debug_skill_xp(player.profile.id)
+	_debug_tools.close()
+	_skill_tree.present(player.profile)
+
+
+func _debug_teleport(destination: Vector2) -> void:
+	if not _map_panel.visible or not _map_panel.map_view.teleport_mode: return
+	if player._diving or player._dashing or player._skill_busy:
+		_map_panel.set_status("Termine a habilidade em andamento antes de teleportar.")
+		return
+	if player._dead:
+		_map_panel.set_status("Reinicie a partida para teleportar um personagem vivo.")
+		return
+	if not arena.is_walkable(destination, 26.0):
+		_map_panel.set_status("Destino bloqueado. Escolha chão livre, longe de água, rochas e portões fechados.")
+		return
+	player.debug_teleport(destination)
+	_last_player_position = destination
+	_exploration.observe(destination)
+	_guide_path.clear()
+	_guide_target = Vector2.INF
+	_map_panel.map_view.queue_redraw()
+	_map_panel.set_status("Teleporte realizado. M / Esc volta ao jogo; clique para escolher outro destino.")
 
 
 ## Pausa o mundo mantendo a interface de pausa disponível.
@@ -995,18 +1091,6 @@ func _finish_round(victory: bool) -> void:
 	$Interface/ResultPanel/Restart.text = "Jogar novamente" if victory else "Tentar novamente"
 
 
-## Cura completamente o jogador vivo quando o botão de debug é pressionado.
-func _on_heal_debug_pressed() -> void:
-	if is_instance_valid(player):
-		player.heal_full()
-
-
-## Remove toda a vida do jogador quando o botão de debug é pressionado.
-func _on_kill_debug_pressed() -> void:
-	if is_instance_valid(player):
-		player.debug_kill()
-
-
 ## Recarrega a cena atual e restaura tutorial, tiles, portões e encontros.
 func _on_restart_pressed() -> void:
 	get_tree().paused = false
@@ -1049,7 +1133,7 @@ func _open_skill_tree() -> void:
 
 func _on_progression_changed(character_id: String) -> void:
 	if character_id == player.profile.id:
-		_tree_button.text = "Tab · Árvore · %d XP" % GameState.get_skill_xp(character_id)
+		_tree_button.text = "Tab · Árvore · %d XP%s" % [GameState.get_skill_xp(character_id), " · TESTE" if not GameState._debug_progression_backup.is_empty() else ""]
 
 
 func _on_skill_used(skill_name: String, _cooldown: float) -> void:
